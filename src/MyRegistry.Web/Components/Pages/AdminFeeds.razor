@@ -1,0 +1,137 @@
+@page "/admin/feeds"
+@inject FeedService Feeds
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["feeds"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["feeds"]</MudText>
+<AdminNav Current="/admin/feeds" />
+
+@if (_user.Role < Role.Admin)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4 mb-3">
+        <MudText Typo="Typo.h6" Class="mb-2">@L["feed_new"]</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="3"><MudTextField @bind-Value="_name" Label="@L["name"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="6" sm="3">
+                <MudSelect T="FeedKind" @bind-Value="_kind" Label="@L["feed_kind"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var k in Enum.GetValues<FeedKind>()) { <MudSelectItem Value="k">@k</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="3"><MudTextField @bind-Value="_branch" Label="@L["feed_branch"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="3"><MudNumericField T="int?" @bind-Value="_interval" Label="@L["feed_interval"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="5" /></MudItem>
+            <MudItem xs="12" sm="8"><MudTextField @bind-Value="_url" Label="@L["feed_url"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="4"><MudTextField @bind-Value="_pat" Label="@L["feed_pat"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        </MudGrid>
+        @foreach (var e in _errors) { <MudAlert Severity="Severity.Error" Dense Class="mt-2"><code>@e.Code</code> @e.Message</MudAlert> }
+        <MudStack Row Spacing="2" Class="mt-2">
+            <MudButton Variant="Variant.Outlined" OnClick="Test">@L["feed_test"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create">@L["feed_create"]</MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @foreach (var f in _feeds)
+    {
+        var ff = f;
+        <MudPaper Class="pa-3 mb-2">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2">
+                <div style="min-width:0">
+                    <b>@ff.Name</b>
+                    <MudChip T="string" Size="Size.Small">@ff.Kind</MudChip>
+                    @if (ff.IsSystem) { <MudChip T="string" Size="Size.Small" Color="Color.Info">system</MudChip> }
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColor(ff.Status)">@(ff.Status == "Paused" ? L["feed_paused"] : ff.Status)</MudChip>
+                    <MudText Typo="Typo.caption" Style="overflow-wrap:anywhere;display:block">@ff.Url · @ff.Branch · @L["feed_ns"] <code>@ff.EffectiveNamespace</code> · @ff.IntervalMinutes min</MudText>
+                    <MudText Typo="Typo.caption">@(ff.LastSyncAt?.ToString("yyyy-MM-dd HH:mm") ?? "—") @(ff.LastCommit is { Length: > 6 } c ? "· " + c[..7] : "")</MudText>
+                </div>
+                <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
+                    @if (!ff.Active) { <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" OnClick="() => Reactivate(ff)">@L["feed_reactivate"]</MudButton> }
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" OnClick="() => Sync(ff.Id)" Disabled="_busy">@L["feed_sync"]</MudButton>
+                    @if (!ff.IsSystem)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="() => Delete(ff.Id)">@(_confirmDelete == ff.Id ? L["feed_delete_confirm"] : L["delete"])</MudButton>
+                    }
+                </MudStack>
+            </MudStack>
+            @if (_last.TryGetValue(ff.Id, out var rep))
+            {
+                <MudAlert Severity="@(rep.Success ? Severity.Success : Severity.Error)" Dense Class="mt-2">
+                    @L["feed_last_report"] : +@rep.Imported ~@rep.Updated =@rep.Unchanged −@rep.Deprecated · ⚑ @rep.Quarantined · ⤼ @rep.Skipped
+                    @foreach (var m in rep.Messages.Take(6)) { <div style="font-size:12px;overflow-wrap:anywhere">@m</div> }
+                </MudAlert>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private IReadOnlyList<FeedDto> _feeds = [];
+    private Dictionary<Guid, FeedReportDto> _last = new();
+    private string _name = "", _url = "", _branch = "main", _pat = "";
+    private FeedKind _kind = FeedKind.GitHub;
+    private int? _interval;
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _errors = [];
+    private Guid? _confirmDelete;
+    private bool _busy;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Admin) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _feeds = await Feeds.ListAsync();
+        foreach (var f in _feeds) if (!_last.ContainsKey(f.Id) && (await Feeds.ReportsAsync(f.Id, 1)).FirstOrDefault() is { } r) _last[f.Id] = r;
+    }
+
+    private FeedRules.FeedInput Input() => new(_name, _kind, _url, _branch, string.IsNullOrWhiteSpace(_pat) ? null : _pat, _interval, null);
+    private static Color StatusColor(string s) => s switch { "Ok" => Color.Success, "Failed" => Color.Error, "Paused" => Color.Warning, _ => Color.Default };
+
+    private async Task Test()
+    {
+        var (ok, message, head, files) = await Feeds.TestConnectionAsync(Input());
+        Snack.Add(ok ? $"{message} ({head?[..7]}, {files} fichiers)" : message, ok ? Severity.Success : Severity.Error);
+    }
+
+    private async Task Create()
+    {
+        var r = await Feeds.CreateAsync(Input(), false, _user.Email);
+        _errors = r.Errors;
+        if (r.Feed is not null) { _name = _url = _pat = ""; await Reload(); }
+    }
+
+    private async Task Sync(Guid id)
+    {
+        _busy = true;
+        if (await Feeds.SyncAsync(id, _user.Email) is { } r) _last[id] = r;
+        _feeds = await Feeds.ListAsync();
+        _busy = false;
+    }
+
+    private async Task Reactivate(FeedDto f)
+    {
+        await Feeds.UpdateAsync(f.Id, new FeedRules.FeedInput(f.Name, Enum.Parse<FeedKind>(f.Kind), f.Url, f.Branch, f.PatRef, f.IntervalMinutes, f.NamespaceOverride), true, _user.Email);
+        await Reload();
+    }
+
+    private async Task Delete(Guid id)
+    {
+        if (_confirmDelete != id) { _confirmDelete = id; return; }
+        await Feeds.DeleteAsync(id, _user.Email);
+        _confirmDelete = null;
+        _last.Remove(id);
+        await Reload();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}
