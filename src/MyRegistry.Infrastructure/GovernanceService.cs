@@ -78,6 +78,16 @@ public class SettingsService(AppDbContext db, MarketplaceCache marketplace)
     public async Task<string> GetAsync(string key, string fallback, CancellationToken ct = default) =>
         (await db.Settings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == key, ct))?.Value ?? fallback;
 
+    /// <summary>Écrit des réglages techniques (digest, dates) sans validation utilisateur ni audit par clé.</summary>
+    public async Task<IReadOnlyList<Issue>> SetInternalAsync(IReadOnlyDictionary<string, string> values, CancellationToken ct = default)
+    {
+        var existing = await db.Settings.ToDictionaryAsync(s => s.Key, ct);
+        foreach (var (k, v) in values)
+            if (existing.TryGetValue(k, out var s)) s.Value = v; else db.Settings.Add(new Setting { Key = k, Value = v });
+        await db.SaveChangesAsync(ct);
+        return [];
+    }
+
     public async Task<IReadOnlyList<Issue>> UpdateAsync(IReadOnlyDictionary<string, string> values, string actor, CancellationToken ct = default)
     {
         var clean = values.ToDictionary(kv => kv.Key, kv => kv.Value.Trim());

@@ -118,6 +118,12 @@ public sealed class Localizer
         ["plugins_export"] = ("Exporter (.zip)", "Export (.zip)"),
         ["plugins_none"] = ("Aucun composant : ajoutez-en depuis la recherche ci-dessous.", "No components yet: add some from the search below."),
         ["plugins_bundle"] = ("Composition du plugin", "Plugin composition"),
+        ["config_repo"] = ("Dépôt du snapshot (chemin ou file:///)", "Snapshot repository (path or file:///)"),
+        ["snapshot"] = ("Snapshot de la marketplace", "Marketplace snapshot"),
+        ["snapshot_publish"] = ("Publier le snapshot", "Publish snapshot"),
+        ["snapshot_last"] = ("Dernier snapshot", "Last snapshot"),
+        ["snapshot_unchanged"] = ("Aucun changement : rien n'a été poussé.", "No change: nothing was pushed."),
+        ["snapshot_done"] = ("Snapshot publié.", "Snapshot published."),
         ["tag_filter"] = ("Tag", "Tag"),
         ["status_all"] = ("Tous statuts", "Any status"),
     };

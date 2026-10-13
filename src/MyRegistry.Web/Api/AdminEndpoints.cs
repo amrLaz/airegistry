@@ -40,6 +40,14 @@ public static class AdminEndpoints
             return errors.Count == 0 ? Results.NoContent() : Results.Problem(statusCode: 422, title: "Configuration invalide", extensions: new Dictionary<string, object?> { ["errors"] = errors });
         }).Require(Role.Admin).WithName("UpdateSettings");
 
+        admin.MapGet("/marketplace/snapshot", async (SnapshotService svc) => await svc.StatusAsync()).Require(Role.Admin).WithName("SnapshotStatus");
+        admin.MapPost("/marketplace/snapshot", async (SnapshotService svc, IAuthProvider auth) =>
+        {
+            var r = await svc.PublishAsync(auth.GetCurrentUser().Email);
+            return r.Errors.Count == 0 ? Results.Ok(r)
+                : Results.Problem(statusCode: 422, title: "Snapshot impossible", extensions: new Dictionary<string, object?> { ["errors"] = r.Errors });
+        }).Require(Role.Admin).WithName("PublishSnapshot");
+
         var catalog = app.MapGroup("/api/catalog").WithTags("Catalogue");
         catalog.MapGet("/{id:guid}/governance", async (Guid id, GovernanceService svc, IAuthProvider auth) =>
             await svc.GetAsync(id, auth.GetCurrentUser()) is { } g ? Results.Ok(g) : Results.NotFound()).WithName("GetGovernance");

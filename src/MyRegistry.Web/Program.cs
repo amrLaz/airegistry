@@ -36,6 +36,8 @@ builder.Services.AddScoped<GovernanceService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddSingleton<MarketplaceCache>();
 builder.Services.AddScoped<PluginService>();
+builder.Services.AddSingleton<IGitProvider, LocalGitProvider>();
+builder.Services.AddScoped<SnapshotService>();
 builder.Services.AddSingleton<SettingsCache>();
 builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
@@ -77,6 +79,9 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
         title = s.GetValueOrDefault(SettingKeys.Title),
         defaultNamespace = s.GetValueOrDefault(SettingKeys.DefaultNamespace),
         publicUrl = s.GetValueOrDefault(SettingKeys.PublicUrl),
+        // Dépôt Git du snapshot de la marketplace (lu par VS Code, Claude Code, Codex, Cursor).
+        marketplaceRepo = MyRegistry.Application.RepoLocation.ToLocalPath(s.GetValueOrDefault(SettingKeys.MarketplaceRepo)) is { } lp
+            ? MyRegistry.Application.RepoLocation.ToFileUrl(lp) : null,
         user = new { u.Email, Role = u.Role.ToString() },
     };
 }).WithName("RegistryInfo");

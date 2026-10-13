@@ -20,10 +20,11 @@ Usage : myregistry <commande> [options]
   pack [chemin] [--type T --name N --output F]
   check [chemin] [--namespace NS --name N --type T]
   publish [chemin] [--dry-run] [--name N] [--namespace NS] [--version V] [--description D] [--tags a,b] [--type T]
+  add-registry [--apply] [--marketplace URL] [-g]   configure le marketplace (VS Code, Claude Code)
   version | help
 
 Variables : MYREGISTRY_BASE_URL, MYREGISTRY_API_TOKEN
-Non implémenté pour l'instant : login, edit, add-registry, completion.`;
+Non implémenté pour l'instant : login, edit, completion.`;
 
 export async function main(argv: string[], deps?: { cwd?: string; home?: string; env?: NodeJS.ProcessEnv; out?: (s: string) => void; err?: (s: string) => void; fetch?: typeof fetch }): Promise<number> {
   const out = deps?.out ?? ((s: string) => console.log(s));
@@ -40,7 +41,7 @@ export async function main(argv: string[], deps?: { cwd?: string; home?: string;
         search: { type: 'string' }, tag: { type: 'string' }, page: { type: 'string' }, 'page-size': { type: 'string' },
         version: { type: 'string', short: 'v' }, name: { type: 'string', short: 'n' }, namespace: { type: 'string' },
         description: { type: 'string', short: 'd' }, tags: { type: 'string' }, output: { type: 'string', short: 'o' },
-        'registry-base-url': { type: 'string' },
+        'registry-base-url': { type: 'string' }, apply: { type: 'boolean' }, marketplace: { type: 'string' },
       },
     });
     const o = values as c.Opts;
@@ -60,7 +61,8 @@ export async function main(argv: string[], deps?: { cwd?: string; home?: string;
       case 'pack': return c.cmdPack(ctx, positionals[0], o);
       case 'check': return await c.cmdCheck(ctx, positionals[0], o);
       case 'publish': return await c.cmdPublish(ctx, positionals[0], o);
-      case 'login': case 'edit': case 'add-registry': case 'completion':
+      case 'add-registry': return await c.cmdAddRegistry(ctx, o);
+      case 'login': case 'edit': case 'completion':
         throw new CliError(`« ${cmd} » n'est pas encore implémentée.`);
       default: throw new CliError(`Commande inconnue : ${cmd}. Voir « myregistry help ».`);
     }

@@ -45,10 +45,10 @@ export class Api {
     return { data: new Uint8Array(await res.arrayBuffer()), sha256: res.headers.get('x-artifact-sha256') };
   }
 
-  async registryInfo(): Promise<{ title?: string; defaultNamespace?: string }> {
+  async registryInfo(): Promise<{ title?: string; defaultNamespace?: string; marketplaceRepo?: string | null; publicUrl?: string | null }> {
     const res = await this.request('/api/registry-info');
     if (!res.ok) throw new CliError(`registry-info indisponible (${res.status}).`);
-    return (await res.json()) as { title?: string; defaultNamespace?: string };
+    return (await res.json()) as { title?: string; defaultNamespace?: string; marketplaceRepo?: string | null; publicUrl?: string | null };
   }
 
   async validate(body: unknown) {

@@ -9,6 +9,8 @@ RUN dotnet publish src/MyRegistry.Web -c Release -o /app --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
+# git : requis par LocalGitProvider (snapshot de la marketplace vers un dépôt local)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 # Utilisateur non-root ; seule écriture autorisée : /data (jetable)
