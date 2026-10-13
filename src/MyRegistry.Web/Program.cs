@@ -32,6 +32,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserDirectory, UserDirectory>();
 builder.Services.AddScoped<IAuthProvider, HttpDevAuthProvider>();
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<GovernanceService>();
+builder.Services.AddScoped<SettingsService>();
 builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();
@@ -71,6 +73,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
     {
         title = s.GetValueOrDefault(SettingKeys.Title),
         defaultNamespace = s.GetValueOrDefault(SettingKeys.DefaultNamespace),
+        publicUrl = s.GetValueOrDefault(SettingKeys.PublicUrl),
         user = new { u.Email, Role = u.Role.ToString() },
     };
 }).WithName("RegistryInfo");

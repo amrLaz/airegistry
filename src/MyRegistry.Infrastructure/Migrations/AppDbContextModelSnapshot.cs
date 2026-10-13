@@ -214,6 +214,49 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.ToTable("comments", (string)null);
                 });
 
+            modelBuilder.Entity("MyRegistry.Domain.Governance", b =>
+                {
+                    b.Property<Guid>("ArtifactId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Capabilities")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DataClass")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("LastReviewed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("ReviewEveryDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Risk")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("ArtifactId");
+
+                    b.ToTable("governance", (string)null);
+                });
+
             modelBuilder.Entity("MyRegistry.Domain.Report", b =>
                 {
                     b.Property<Guid>("Id")
