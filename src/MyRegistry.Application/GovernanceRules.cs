@@ -51,7 +51,9 @@ public static class SettingsRules
                     errors.Add(new(k, "Namespace : 2 à 32 caractères, minuscules, chiffres, tirets simples.")); break;
                 case SettingKeys.PublicUrl when v.Length > 0 && !(Uri.TryCreate(v, UriKind.Absolute, out var u) && u.Scheme is "http" or "https"):
                     errors.Add(new(k, "URL publique invalide (http ou https).")); break;
-                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl):
+                case SettingKeys.MarketplaceRepo when v.Length > 0 && RepoLocation.ToLocalPath(v) is null:
+                    errors.Add(new(k, "Dépôt du snapshot : chemin absolu ou file:///chemin (les dépôts distants arrivent en phase 5).")); break;
+                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo):
                     errors.Add(new(k, "Réglage inconnu.")); break;
             }
         }

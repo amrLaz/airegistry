@@ -77,5 +77,51 @@ public class SettingsRulesTests
     [InlineData("inconnu", "x")]
     public void Invalid_values_are_rejected(string key, string value) => Assert.NotEmpty(V(key, value));
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("file:///var/lib/myregistry/marketplace")]
+    [InlineData("/var/lib/myregistry/marketplace")]
+    public void Marketplace_repo_accepts_local_absolute_locations(string v) => Assert.Empty(V(SettingKeys.MarketplaceRepo, v));
+
+    [Theory]
+    [InlineData("https://github.com/org/repo.git")]
+    [InlineData("git@github.com:org/repo.git")]
+    [InlineData("relative/path")]
+    [InlineData("/")]
+    [InlineData("/var/../etc")]
+    [InlineData("file://remote-host/share")]
+    public void Marketplace_repo_rejects_remote_relative_root_and_traversal(string v) => Assert.NotEmpty(V(SettingKeys.MarketplaceRepo, v));
+
     [Fact] public void Title_length_limit() => Assert.NotEmpty(V(SettingKeys.Title, new string('a', 81)));
+}
+
+public class RepoLocationTests
+{
+    [Fact] public void File_url_and_plain_path_resolve_to_the_same_local_path() =>
+        Assert.Equal(RepoLocation.ToLocalPath("/srv/repo"), RepoLocation.ToLocalPath("file:///srv/repo"));
+
+    [Fact] public void Trailing_slash_is_ignored() => Assert.Equal("/srv/repo", RepoLocation.ToLocalPath("/srv/repo/"));
+    [Fact] public void Escaped_characters_are_decoded() => Assert.Equal("/srv/my repo", RepoLocation.ToLocalPath("file:///srv/my%20repo"));
+    [Fact] public void File_url_round_trip() => Assert.Equal("file:///srv/repo", RepoLocation.ToFileUrl("/srv/repo"));
+}
+
+public class MarketplaceSnapshotTests
+{
+    [Fact] public void Writes_the_same_manifest_for_the_four_agents()
+    {
+        var files = MarketplaceSnapshot.Files("{}");
+        Assert.Equal(4, files.Count);
+        Assert.Contains(".github/plugin/marketplace.json", files.Keys);
+        Assert.Contains(".claude-plugin/marketplace.json", files.Keys);
+        Assert.Contains(".agents/plugins/marketplace.json", files.Keys);
+        Assert.Contains(".cursor-plugin/marketplace.json", files.Keys);
+        Assert.All(files.Values, v => Assert.Equal("{}", v));
+    }
+
+    [Fact] public void Digest_is_stable_and_content_sensitive()
+    {
+        Assert.Equal(MarketplaceSnapshot.Digest("a"), MarketplaceSnapshot.Digest("a"));
+        Assert.NotEqual(MarketplaceSnapshot.Digest("a"), MarketplaceSnapshot.Digest("b"));
+        Assert.Equal(64, MarketplaceSnapshot.Digest("a").Length);
+    }
 }
