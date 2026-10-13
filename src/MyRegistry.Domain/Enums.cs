@@ -7,3 +7,7 @@ public enum VersionStatus { Pending, Approved, ToReview, Deprecated }
 public enum Role { Reader, Publisher, Moderator, SecurityValidator, Admin }
 
 public enum ReportReason { PromptInjection, DataLeak, InappropriateContent, BrokenArtifact }
+
+public enum RiskLevel { Low, Medium, High, Critical }
+
+public enum DataClass { Public, Internal, Confidential, Restricted }

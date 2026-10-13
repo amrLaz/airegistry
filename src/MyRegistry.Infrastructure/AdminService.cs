@@ -10,7 +10,7 @@ public sealed record VersionRow(Guid Id, string Namespace, string Name, Artifact
     bool Quarantined, string CreatedBy, DateTime CreatedAt, int OpenReports);
 public sealed record ReportRow(Guid Id, Guid VersionId, string Artifact, string Version, string UserId, string Reason, string? Details, string Status, DateTime At);
 public sealed record Dashboard(int Artifacts, int Versions, Dictionary<string, int> ByStatus, Dictionary<string, int> ByType,
-    int Quarantined, int OpenReports, int Users, IReadOnlyList<AuditDto> Recent);
+    int Quarantined, int OpenReports, int Users, IReadOnlyList<AuditDto> Recent, int ReviewsDue);
 
 public class AdminService(AppDbContext db)
 {
@@ -65,7 +65,8 @@ public class AdminService(AppDbContext db)
             versions.GroupBy(v => v.Artifact.Type.ToString()).ToDictionary(g => g.Key, g => g.Count()),
             versions.Count(v => v.Quarantined),
             await db.Reports.CountAsync(r => r.Status == "Open", ct),
-            await db.Users.CountAsync(ct), recent);
+            await db.Users.CountAsync(ct), recent,
+            (await db.Governances.AsNoTracking().ToListAsync(ct)).Count(g => GovernancePolicy.ReviewDue(g.ReviewEveryDays, g.LastReviewed, g.UpdatedAt, DateTime.UtcNow)));
     }
 
     // ---- Modération ----

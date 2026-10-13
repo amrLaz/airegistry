@@ -32,7 +32,32 @@ public static class AdminEndpoints
         app.MapGet("/api/audit", async (AdminService svc, string? action, string? user, int? page, int? pageSize) =>
             await svc.AuditAsync(action, user, page ?? 1, pageSize ?? 50)).Require(Role.Admin).WithTags("Administration").WithName("Audit");
 
+        admin.MapGet("/settings", async (SettingsService svc) => await svc.GetAllAsync()).Require(Role.Admin).WithName("Settings");
+        admin.MapPut("/settings", async (Dictionary<string, string> body, SettingsService svc, IAuthProvider auth, MyRegistry.Web.Services.SettingsCache cache) =>
+        {
+            var errors = await svc.UpdateAsync(body, auth.GetCurrentUser().Email);
+            cache.Invalidate();
+            return errors.Count == 0 ? Results.NoContent() : Results.Problem(statusCode: 422, title: "Configuration invalide", extensions: new Dictionary<string, object?> { ["errors"] = errors });
+        }).Require(Role.Admin).WithName("UpdateSettings");
+
         var catalog = app.MapGroup("/api/catalog").WithTags("Catalogue");
+        catalog.MapGet("/{id:guid}/governance", async (Guid id, GovernanceService svc, IAuthProvider auth) =>
+            await svc.GetAsync(id, auth.GetCurrentUser()) is { } g ? Results.Ok(g) : Results.NotFound()).WithName("GetGovernance");
+
+        catalog.MapPost("/{id:guid}/governance", async (Guid id, GovernanceInput body, GovernanceService svc, IAuthProvider auth) =>
+        {
+            var r = await svc.SaveAsync(id, body, auth.GetCurrentUser());
+            if (r.NotFound) return Results.NotFound();
+            if (r.Forbidden) return Results.Problem(statusCode: 403, title: "Seuls l'auteur, un SecurityValidator ou un Admin peuvent modifier le contrat de gouvernance");
+            return r.Errors.Count > 0
+                ? Results.Problem(statusCode: 422, title: "Contrat de gouvernance invalide", extensions: new Dictionary<string, object?> { ["errors"] = r.Errors })
+                : Results.Ok(r.Contract);
+        }).Require(Role.Publisher).WithName("SaveGovernance");
+
+        catalog.MapGet("/capabilities-inventory", async (GovernanceService svc) =>
+            (await svc.CapabilitiesInventoryAsync()).Select(c => new { capability = c.Capability, artifacts = c.Artifacts }))
+            .Require(Role.Reader).WithName("CapabilitiesInventory");
+
         catalog.MapPost("/{id:guid}/reject", async (Guid id, RejectRequest body, AdminService svc, IAuthProvider auth) =>
         {
             if (string.IsNullOrWhiteSpace(body.Reason)) return Results.Problem(statusCode: 400, title: "Un motif de rejet est obligatoire");

@@ -3,6 +3,7 @@
 @inject Localizer L
 @inject IAuthProvider Auth
 @inject NavigationManager Nav
+@inject SettingsCache Settings
 @implements IDisposable
 
 <PageTitle>@L["publish"] · MyRegistry</PageTitle>
@@ -63,12 +64,12 @@
 
 @code {
     private ArtifactType _type = ArtifactType.Skill;
-    private string _ns = "myregistry", _name = "", _version = "", _fileName = "SKILL.md", _description = "", _tags = "", _content = "";
+    private string _ns = "", _name = "", _version = "", _fileName = "SKILL.md", _description = "", _tags = "", _content = "";
     private bool _busy;
     private ImportResult? _result;
     private CurrentUser _user = default!;
 
-    protected override void OnInitialized() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; }
+    protected override async Task OnInitializedAsync() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; _ns = await Settings.DefaultNamespaceAsync(); }
 
     private async Task OnFile(IBrowserFile f)
     {

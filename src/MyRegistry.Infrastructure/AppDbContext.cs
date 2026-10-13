@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<StatusHistory> StatusHistory => Set<StatusHistory>();
     public DbSet<AuditEntry> Audit => Set<AuditEntry>();
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<Governance> Governances => Set<Governance>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -82,6 +83,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Email).IsUnique();
             e.Property(x => x.Email).HasMaxLength(200);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<Governance>(e =>
+        {
+            e.ToTable("governance");
+            e.HasKey(x => x.ArtifactId);
+            e.Property(x => x.OwnerId).HasMaxLength(200);
+            e.Property(x => x.Risk).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.DataClass).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Capabilities).HasConversion(
+                v => string.Join(',', v),
+                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+                    (a, c) => a!.SequenceEqual(c!), c => c.Aggregate(0, (h, x) => HashCode.Combine(h, x.GetHashCode())), c => c.ToList()));
         });
         b.Entity<AuditEntry>(e => { e.ToTable("audit_log"); e.HasIndex(x => x.At); });
     }

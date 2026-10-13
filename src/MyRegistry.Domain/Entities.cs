@@ -110,3 +110,17 @@ public class AppUser
     public bool Active { get; set; } = true;
     public DateTime? LastLogin { get; set; }
 }
+
+/// <summary>Contrat de gouvernance d'un artefact (une famille).</summary>
+public class Governance
+{
+    public Guid ArtifactId { get; set; }
+    public string OwnerId { get; set; } = "";
+    public RiskLevel Risk { get; set; } = RiskLevel.Low;
+    public DataClass DataClass { get; set; } = DataClass.Internal;
+    public int? ReviewEveryDays { get; set; }
+    public DateTime? LastReviewed { get; set; }
+    public List<string> Capabilities { get; set; } = [];
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public string UpdatedBy { get; set; } = "";
+}

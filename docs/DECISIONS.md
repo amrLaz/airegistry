@@ -71,3 +71,12 @@
 - **Suppression de version** : la plus haute version SemVer (à défaut la plus récente) est protégée ; la seule version restante ne peut pas être supprimée (409). Modérateur+. `DeletionPolicy` testée unitairement.
 - **Pages** : `/admin` (KPI, répartition par statut et famille, activité récente), `/admin/moderation` (filtres Pending/Approved/Deprecated/ToReview/Quarantaine + recherche), `/admin/reports`, `/admin/users`, `/admin/audit`.
 - **Reste phase 3** : contrat de gouvernance (propriétaire, risque, classe de données, revue), page de configuration générale, Sanity Check/Réparer (dépend des feeds Git, phase 5), déquarantaine auto à revoir.
+
+## 2026-10-13 — Phase 3, gouvernance (tranche 2 : contrat et configuration)
+- **Contrat de gouvernance par famille d'artefact** (table `governance`) : propriétaire, niveau de risque (Low/Medium/High/Critical), classe de données (Public/Internal/Confidential/Restricted), fréquence de revue, capabilities. Les enums de docs/02 « à définir » sont fixés ainsi.
+- **Édition** : auteur (créateur de la première version), SecurityValidator ou Admin ; un Moderator ne peut pas. Sans contrat, le propriétaire par défaut affiché est l'auteur (`defined=false`).
+- **Revue due** : fréquence définie ET dernière revue (à défaut, dernière mise à jour du contrat) plus ancienne que la fréquence. « Marquer comme revu » fixe la date. Compteur « Revues dues » au tableau de bord. Pas encore de notification (phase 8).
+- **Capabilities** : normalisées (minuscules, tirets), dédoublonnées, 20 max ; inventaire `GET /api/catalog/capabilities-inventory` (union avec nombre d'artefacts).
+- **Configuration** (`/admin/config`, `GET|PUT /api/admin/settings`, Admin) : titre, namespace par défaut, URL publique, validés et audités. Le titre du bandeau et le namespace pré-rempli à la publication viennent des réglages (`SettingsCache`, 30 s, invalidé à l'enregistrement). `registry-info` expose `publicUrl`.
+- **`SettingsCache` avec son propre scope** : évite les opérations concurrentes sur le DbContext du circuit Blazor.
+- **Reste phase 3** : Sanity Check / Réparer (dépend des feeds Git, phase 5) ; déquarantaine automatique à revoir ; notification des revues dues (phase 8).
