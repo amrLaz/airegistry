@@ -30,17 +30,17 @@
         @if (_user.Role >= Role.Publisher)
         {
             <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
-            <MudMenu Icon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Style="background:#0F9D8A;color:#fff" Class="mr-1" aria-label="@L["create"]">
-                <MudMenuItem Href="/publish">@L["publish"]</MudMenuItem>
-                <MudMenuItem Href="/plugins">@L["plugins"]</MudMenuItem>
-            </MudMenu>
+                <MudMenu Icon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Style="background:#0F9D8A;color:#fff" Class="mr-1" aria-label="@L["create"]">
+                    @CreateItems
+                </MudMenu>
             </MudHidden>
             <MudHidden Breakpoint="Breakpoint.Xs">
-            <MudMenu Label="@L["create"]" StartIcon="@Icons.Material.Filled.Add" EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
-                     Variant="Variant.Filled" Color="Color.Primary" Style="background:#0F9D8A;color:#fff;border-radius:999px" Class="mr-2">
-                <MudMenuItem Href="/publish">@L["publish"]</MudMenuItem>
-                <MudMenuItem Href="/plugins">@L["plugins"]</MudMenuItem>
-            </MudMenu>
+                <MudTooltip Text="@L["create_tooltip"]">
+                    <MudMenu Label="@L["create"]" StartIcon="@Icons.Material.Filled.Add" EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                             Variant="Variant.Filled" Color="Color.Primary" Style="background:#0F9D8A;color:#fff;border-radius:999px" Class="mr-2">
+                        @CreateItems
+                    </MudMenu>
+                </MudTooltip>
             </MudHidden>
         }
 
@@ -76,6 +76,29 @@
 
 @code {
     private bool _dark;
+
+    private static readonly (ArtifactType Type, string Icon)[] CreatableTypes =
+    [
+        (ArtifactType.McpServer, Icons.Material.Filled.Dns), (ArtifactType.Skill, Icons.Material.Filled.Psychology),
+        (ArtifactType.Agent, Icons.Material.Filled.SmartToy), (ArtifactType.Prompt, Icons.Material.Filled.Chat),
+        (ArtifactType.Hook, Icons.Material.Filled.Webhook),
+    ];
+
+    private RenderFragment CreateItems =>
+    @<text>
+        <MudText Typo="Typo.overline" Class="px-4" Color="Color.Secondary">@L["create_section_publish"]</MudText>
+        <MudMenuItem Href="/publish" Icon="@Icons.Material.Filled.CloudUpload">@L["publish_artifact"]</MudMenuItem>
+        @foreach (var (type, icon) in CreatableTypes)
+        {
+            <MudMenuItem Href="@($"/publish?type={type}")" Icon="@icon">@TypeStyle.Label(type, L.Lang == "fr")</MudMenuItem>
+        }
+        <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Extension">@L["compose_plugin"]</MudMenuItem>
+        <MudDivider Class="my-1" />
+        <MudText Typo="Typo.overline" Class="px-4" Color="Color.Secondary">@L["create_section_edit"]</MudText>
+        <MudMenuItem Href="/my" Icon="@Icons.Material.Filled.Upload">@L["my_pubs"]</MudMenuItem>
+        <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Tune">@L["plugin_editor"]</MudMenuItem>
+    </text>;
+
     private readonly MudTheme _theme = new()
     {
         PaletteLight = new PaletteLight { Primary = "#0F9D8A", Secondary = "#4B6258", TextPrimary = "#10211C", TextSecondary = "#4B6258", PrimaryContrastText = "#FFFFFF", Background = "#F4F7F5", Surface = "#FFFFFF", AppbarBackground = "#FFFFFF", AppbarText = "#10211C" },
