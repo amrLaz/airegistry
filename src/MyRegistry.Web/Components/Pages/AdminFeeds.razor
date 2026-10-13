@@ -3,6 +3,7 @@
 @inject Localizer L
 @inject IAuthProvider Auth
 @inject ISnackbar Snack
+@inject ILogger<AdminFeeds> Log
 @implements IDisposable
 
 <PageTitle>@L["feeds"] · MyRegistry</PageTitle>
@@ -125,15 +126,35 @@ else
 
     private async Task Test()
     {
-        var (ok, message, head, files) = await Feeds.TestConnectionAsync(Input());
-        Snack.Add(ok ? $"{message} ({head?[..7]}, {files} fichiers)" : message, ok ? Severity.Success : Severity.Error);
+        try
+        {
+            var (ok, message, head, files) = await Feeds.TestConnectionAsync(Input());
+            Snack.Add(ok ? $"{message} ({head?[..Math.Min(7, head.Length)]}, {files} fichiers)" : message, ok ? Severity.Success : Severity.Error);
+        }
+        catch (Exception ex) { Fail(ex); }
     }
 
     private async Task Create()
     {
-        var r = await Feeds.CreateAsync(Input(), false, _user.Email);
-        _errors = r.Errors;
-        if (r.Feed is not null) { _name = _url = _pat = ""; await Reload(); }
+        try
+        {
+            var r = await Feeds.CreateAsync(Input(), false, _user.Email);
+            _errors = r.Errors;
+            if (r.Feed is not null)
+            {
+                _name = _url = _pat = "";
+                Snack.Add(L["feed_created"], Severity.Success);
+                await Reload();
+            }
+        }
+        catch (Exception ex) { Fail(ex); }
+    }
+
+    // Une exception ne doit jamais tuer le circuit en silence : on l'affiche et on la journalise.
+    private void Fail(Exception ex)
+    {
+        Log.LogError(ex, "Feed operation failed");
+        _errors = [new MyRegistry.Application.Rules.Issue("error", ex.GetBaseException().Message)];
     }
 
     private async Task Sync(Guid id)
