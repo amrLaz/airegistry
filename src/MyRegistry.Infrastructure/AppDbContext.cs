@@ -6,6 +6,15 @@ namespace MyRegistry.Infrastructure;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<Artifact> Artifacts => Set<Artifact>();
+    public DbSet<ArtifactVersion> Versions => Set<ArtifactVersion>();
+    public DbSet<VersionFile> Files => Set<VersionFile>();
+    public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<Vote> Votes => Set<Vote>();
+    public DbSet<Report> Reports => Set<Report>();
+    public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<StatusHistory> StatusHistory => Set<StatusHistory>();
+    public DbSet<AuditEntry> Audit => Set<AuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -16,5 +25,56 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Key).HasColumnName("key").HasMaxLength(100);
             e.Property(x => x.Value).HasColumnName("value");
         });
+
+        b.Entity<Artifact>(e =>
+        {
+            e.ToTable("artifacts");
+            e.HasIndex(x => new { x.Namespace, x.Name, x.Type }).IsUnique();
+            e.Property(x => x.Namespace).HasMaxLength(32);
+            e.Property(x => x.Name).HasMaxLength(48);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.HasMany(x => x.Versions).WithOne(v => v.Artifact).HasForeignKey(v => v.ArtifactId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Tags).WithMany(t => t.Artifacts).UsingEntity("artifact_tags");
+            e.HasMany(x => x.Votes).WithOne().HasForeignKey(v => v.ArtifactId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ArtifactVersion>(e =>
+        {
+            e.ToTable("artifact_versions");
+            e.HasIndex(x => new { x.ArtifactId, x.Version }).IsUnique();
+            e.HasIndex(x => x.ContentHash);
+            e.Property(x => x.Version).HasMaxLength(64);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Origin).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ContentHash).HasMaxLength(64);
+            e.Property(x => x.QualityGrade).HasMaxLength(1);
+            e.HasMany(x => x.Files).WithOne().HasForeignKey(f => f.VersionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.History).WithOne().HasForeignKey(h => h.VersionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<VersionFile>(e =>
+        {
+            e.ToTable("version_files");
+            e.HasKey(x => new { x.VersionId, x.Path });
+        });
+
+        b.Entity<Tag>(e =>
+        {
+            e.ToTable("tags");
+            e.HasIndex(x => new { x.Type, x.Name }).IsUnique();
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(40);
+        });
+
+        b.Entity<Vote>(e => { e.ToTable("votes"); e.HasKey(x => new { x.ArtifactId, x.UserId }); });
+        b.Entity<Report>().ToTable("reports");
+        b.Entity<Comment>().ToTable("comments");
+        b.Entity<StatusHistory>(e =>
+        {
+            e.ToTable("status_history");
+            e.Property(x => x.From).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.To).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<AuditEntry>(e => { e.ToTable("audit_log"); e.HasIndex(x => x.At); });
     }
 }

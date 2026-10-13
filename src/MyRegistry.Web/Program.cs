@@ -3,6 +3,7 @@ using MudBlazor.Services;
 using MyRegistry.Application;
 using MyRegistry.Domain;
 using MyRegistry.Infrastructure;
+using MyRegistry.Web.Api;
 using MyRegistry.Web.Components;
 using MyRegistry.Web.Services;
 using Scalar.AspNetCore;
@@ -23,6 +24,10 @@ builder.Services.AddSingleton(new DevAuthOptions
 });
 builder.Services.AddScoped<IAuthProvider, DevAuthProvider>();
 builder.Services.AddScoped<Localizer>();
+builder.Services.AddScoped<PublishService>();
+builder.Services.AddScoped<CatalogService>();
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+builder.Services.AddProblemDetails();
 
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks()
@@ -59,6 +64,8 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
         user = new { u.Email, Role = u.Role.ToString() },
     };
 }).WithName("RegistryInfo");
+
+app.MapApi();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

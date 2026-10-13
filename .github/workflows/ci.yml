@@ -6,6 +6,18 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myregistry
+          POSTGRES_PASSWORD: myregistry
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U myregistry" --health-interval 5s --health-retries 10
+    env:
+      MYREGISTRY_TEST_DB: Host=localhost;Username=myregistry;Password=myregistry;Database=postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
