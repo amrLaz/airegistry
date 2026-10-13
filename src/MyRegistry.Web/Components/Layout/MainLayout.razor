@@ -21,6 +21,10 @@
         {
             <MudButton Href="/admin" Color="Color.Inherit" Class="mr-1">@L["admin"]</MudButton>
         }
+        @if (_user.Role >= Role.Publisher)
+        {
+            <MudButton Href="/plugins" Color="Color.Inherit" Class="mr-1">@L["plugins"]</MudButton>
+        }
         <MudButton Href="/my" Color="Color.Inherit" Class="mr-1">@L["my_pubs"]</MudButton>
         <MudButton Href="/publish" Variant="Variant.Filled" Style="background:#C6F24E;color:#10211C" Class="mr-2">@L["publish"]</MudButton>
         <MudButton Color="Color.Inherit" OnClick="L.Toggle" aria-label="@L["lang"]">@(L.Lang == "fr" ? "EN" : "FR")</MudButton>

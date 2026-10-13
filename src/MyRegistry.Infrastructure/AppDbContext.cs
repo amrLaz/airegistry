@@ -17,6 +17,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AuditEntry> Audit => Set<AuditEntry>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<Governance> Governances => Set<Governance>();
+    public DbSet<PluginDraft> PluginDrafts => Set<PluginDraft>();
+    public DbSet<PluginComponent> PluginComponents => Set<PluginComponent>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -83,6 +85,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Email).IsUnique();
             e.Property(x => x.Email).HasMaxLength(200);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<PluginDraft>(e =>
+        {
+            e.ToTable("plugin_drafts");
+            e.HasIndex(x => x.OwnerId);
+            e.Property(x => x.OwnerId).HasMaxLength(200);
+            e.Property(x => x.Namespace).HasMaxLength(32);
+            e.Property(x => x.Name).HasMaxLength(48);
+        });
+        b.Entity<PluginComponent>(e =>
+        {
+            e.ToTable("plugin_components");
+            e.HasIndex(x => x.PluginVersionId);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Slug).HasMaxLength(100);
+            e.Property(x => x.ExactVersion).HasMaxLength(64);
         });
         b.Entity<Governance>(e =>
         {

@@ -124,3 +124,29 @@ public class Governance
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public string UpdatedBy { get; set; } = "";
 }
+
+/// <summary>Brouillon de plugin dans l'éditeur (composition non encore publiée).</summary>
+public class PluginDraft
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string OwnerId { get; set; } = "";
+    public string Namespace { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    public string? Version { get; set; }
+    /// <summary>Composants épinglés, sérialisés en JSON : [{type, slug, version}].</summary>
+    public string ComponentsJson { get; set; } = "[]";
+    public Guid? PublishedVersionId { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Composant épinglé d'une version de plugin publiée (docs/02 : plugin_components).</summary>
+public class PluginComponent
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid PluginVersionId { get; set; }
+    public ArtifactType Type { get; set; }
+    public string Slug { get; set; } = "";
+    public string ExactVersion { get; set; } = "";
+    public bool Resolved { get; set; }
+}

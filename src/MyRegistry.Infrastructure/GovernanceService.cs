@@ -70,7 +70,7 @@ public class GovernanceService(AppDbContext db)
     }
 }
 
-public class SettingsService(AppDbContext db)
+public class SettingsService(AppDbContext db, MarketplaceCache marketplace)
 {
     public async Task<Dictionary<string, string>> GetAllAsync(CancellationToken ct = default) =>
         await db.Settings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, ct);
@@ -93,6 +93,7 @@ public class SettingsService(AppDbContext db)
         if (changes.Count > 0)
             db.Audit.Add(new AuditEntry { UserId = actor, Action = "settings-update", Entity = "Settings", EntityId = "global", Details = string.Join("; ", changes) });
         await db.SaveChangesAsync(ct);
+        marketplace.Invalidate();
         return [];
     }
 }

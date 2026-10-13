@@ -2,6 +2,7 @@
 @inject CatalogService Svc
 @inject CommunityService Community
 @inject GovernanceService GovSvc
+@inject PluginService PluginSvc
 @inject ISnackbar Snack
 @inject Localizer L
 @inject IAuthProvider Auth
@@ -60,6 +61,20 @@
                         </div>
                     }
                 </MudPaper>
+                @if (_v.Artifact.Type == ArtifactType.Plugin)
+                {
+                    <MudPaper Class="pa-4 mb-3">
+                        <MudText Typo="Typo.h6">@L["plugins_bundle"]</MudText>
+                        @foreach (var c in _pluginComponents)
+                        {
+                            var upd = _pluginUpdates.FirstOrDefault(u => u.Slug == c.Slug);
+                            <div style="display:flex;justify-content:space-between;gap:8px;border-top:1px dashed rgba(128,128,128,.3);padding:8px 0">
+                                <span><MudChip T="string" Size="Size.Small" Style="@($"background:{TypeStyle.Color(c.Type)};color:#fff")">@TypeStyle.Label(c.Type, L.Lang == "fr")</MudChip> <b>@c.Slug</b> <span style="font-family:monospace">v@(c.Version)</span></span>
+                                @if (upd is not null) { <MudChip T="string" Size="Size.Small" Color="Color.Warning">@L["plugins_update"] : v@(upd.Latest)</MudChip> }
+                            </div>
+                        }
+                    </MudPaper>
+                }
                 <MudPaper Class="pa-4 mb-3">
                     <MudText Typo="Typo.h6">@L["content_tab"]</MudText>
                     <MudSelect T="string" @bind-Value="_selectedFile" Variant="Variant.Outlined" Dense Class="mb-2" aria-label="@L["files"]">
@@ -164,6 +179,8 @@
     private int _votes;
     private CurrentUser _user = default!;
     private string? _selectedFile;
+    private IReadOnlyList<ComponentRef> _pluginComponents = [];
+    private IReadOnlyList<ComponentUpdate> _pluginUpdates = [];
     private GovernanceDto? _gov;
     private string _govOwner = "", _govCaps = "";
     private RiskLevel _govRisk;
@@ -186,6 +203,12 @@
             _selectedFile = (_v.Files.FirstOrDefault(f => f.Path == _v.MainFile) ?? _v.Files.FirstOrDefault(f => !f.IsBinary))?.Path;
             _comments = (await Community.CommentsAsync(Id))?.ToList() ?? [];
             await LoadGovernance();
+            if (_v.Artifact.Type == ArtifactType.Plugin)
+            {
+                var manifest = _v.Files.FirstOrDefault(f => PluginRules.ManifestPaths.Contains(f.Path));
+                _pluginComponents = manifest is null ? [] : PluginRules.ReadManifest(System.Text.Encoding.UTF8.GetString(manifest.Content));
+                _pluginUpdates = await PluginSvc.UpdatesForVersionAsync(Id);
+            }
         }
     }
 

@@ -1,0 +1,81 @@
+@page "/plugins"
+@inject PluginService Plugins
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject SettingsCache Settings
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["plugins"] · MyRegistry</PageTitle>
+<MudStack Spacing="3">
+    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+        <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800">@L["plugins"]</MudText>
+        @if (_user.Role >= Role.Publisher)
+        {
+            <MudStack Row Spacing="2">
+                <MudFileUpload T="IBrowserFile" FilesChanged="Import" Accept=".zip">
+                    <ActivatorContent><MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile">@L["plugins_import"]</MudButton></ActivatorContent>
+                </MudFileUpload>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateNew">@L["plugins_new"]</MudButton>
+            </MudStack>
+        }
+    </MudStack>
+
+    @if (_user.Role < Role.Publisher)
+    {
+        <MudAlert Severity="Severity.Warning">Rôle Publisher requis.</MudAlert>
+    }
+    else if (_drafts.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">@L["plugins_empty"]</MudAlert>
+    }
+    else
+    {
+        <MudPaper Class="pa-2">
+            @foreach (var d in _drafts)
+            {
+                <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="pa-2" Style="border-bottom:1px dashed rgba(128,128,128,.3)">
+                    <MudLink Href="@($"/plugins/{d.Id}")" Underline="Underline.None" Color="Color.Inherit">
+                        <b>@d.Namespace/@(string.IsNullOrEmpty(d.Name) ? "…" : d.Name)</b>
+                        <MudText Typo="Typo.caption" Class="ml-2">@d.Components.Count composant(s) · @d.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    </MudLink>
+                    <MudStack Row Spacing="1">
+                        @if (d.Updates.Count > 0) { <MudChip T="string" Size="Size.Small" Color="Color.Warning">@L["plugins_update"] (@d.Updates.Count)</MudChip> }
+                        @if (d.PublishedVersionId is not null) { <MudChip T="string" Size="Size.Small" Color="Color.Success" Href="@($"/artifact/{d.PublishedVersionId}")">v@(d.Version)</MudChip> }
+                    </MudStack>
+                </MudStack>
+            }
+        </MudPaper>
+    }
+</MudStack>
+
+@code {
+    private IReadOnlyList<DraftDto> _drafts = [];
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Publisher) _drafts = await Plugins.ListDraftsAsync(_user.Email);
+    }
+
+    private async Task CreateNew()
+    {
+        var r = await Plugins.SaveDraftAsync(null, new DraftInput(await Settings.DefaultNamespaceAsync(), "", null, null, []), _user);
+        if (r.Draft is not null) Nav.NavigateTo($"/plugins/{r.Draft.Id}");
+    }
+
+    private async Task Import(IBrowserFile f)
+    {
+        using var ms = new MemoryStream();
+        await f.OpenReadStream(2_000_000).CopyToAsync(ms);
+        var r = await Plugins.ImportDraftAsync(ms.ToArray(), _user);
+        if (r.Draft is not null) Nav.NavigateTo($"/plugins/{r.Draft.Id}");
+        else Snack.Add(string.Join(" ", r.Errors.Select(e => e.Message)), Severity.Error);
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

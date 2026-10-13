@@ -8,7 +8,7 @@ public sealed record CommentDto(Guid Id, string UserId, string Body, DateTime At
 public sealed record ReportResult(bool Accepted, bool Quarantined);
 public sealed record MyPublication(Guid Id, string Namespace, string Name, ArtifactType Type, string Version, VersionStatus Status, bool Quarantined, DateTime CreatedAt);
 
-public class CommunityService(AppDbContext db)
+public class CommunityService(AppDbContext db, MarketplaceCache marketplace)
 {
     public async Task<ReportResult?> ReportAsync(Guid versionId, ReportReason reason, string? details, string userId, CancellationToken ct = default)
     {
@@ -23,6 +23,7 @@ public class CommunityService(AppDbContext db)
         if (!v.Quarantined && QuarantinePolicy.ShouldQuarantine(times, now))
         {
             v.Quarantined = true;
+            marketplace.Invalidate();
             db.Audit.Add(new AuditEntry { UserId = "system", Action = "quarantine", Entity = "ArtifactVersion", EntityId = versionId.ToString(), Details = "auto: ≥5 reports/1h" });
             await db.SaveChangesAsync(ct);
         }
@@ -34,6 +35,7 @@ public class CommunityService(AppDbContext db)
         var v = await db.Versions.FirstOrDefaultAsync(x => x.Id == versionId, ct);
         if (v is null) return false;
         v.Quarantined = false;
+        marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = userId, Action = "quarantine-release", Entity = "ArtifactVersion", EntityId = versionId.ToString() });
         await db.SaveChangesAsync(ct);
         return true;
@@ -72,6 +74,7 @@ public class CommunityService(AppDbContext db)
         if (!isModerator && v.CreatedBy != userId) return false;
         db.StatusHistory.Add(new StatusHistory { VersionId = versionId, From = v.Status, To = VersionStatus.Deprecated, UserId = userId, Note = "unpublish" });
         v.Status = VersionStatus.Deprecated;
+        marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = userId, Action = "unpublish", Entity = "ArtifactVersion", EntityId = versionId.ToString() });
         await db.SaveChangesAsync(ct);
         return true;
