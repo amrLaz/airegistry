@@ -24,6 +24,18 @@ curl -X POST http://localhost:5000/api/import -H 'content-type: application/json
   "rawContent":"---\nname: pdf-extractor\ndescription: Extrait des PDF\n---\n# PDF"}'
 ```
 
+## CLI `myregistry`
+```bash
+cd cli && npm install && npm run build
+export MYREGISTRY_BASE_URL=http://localhost:5108      # URL affichée par « dotnet run »
+node dist/index.js publish ./mon-skill --dry-run      # valider sans publier
+node dist/index.js publish ./mon-skill                # soumettre (statut Pending)
+# approuver l'artefact depuis l'interface (Admin), puis :
+node dist/index.js add myregistry/mon-skill --agent claude
+node dist/index.js list && node dist/index.js outdated
+```
+Commandes disponibles : `config`, `list [-r]`, `add`, `remove`, `outdated`, `update`, `pack`, `check`, `publish [--dry-run]`, `version`. Pas encore : `login`, `edit`, `add-registry`, `completion`.
+
 ## Avec PostgreSQL (plus tard)
 ```bash
 docker compose up -d db

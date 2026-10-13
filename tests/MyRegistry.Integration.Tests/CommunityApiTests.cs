@@ -113,4 +113,17 @@ public class CommunityApiTests(DbFixture db)
     [Fact]
     public async Task Report_on_unknown_version_is_404() =>
         Assert.Equal(HttpStatusCode.NotFound, (await Client().PostAsJsonAsync($"/api/catalog/{Guid.NewGuid()}/report", new { reason = "DataLeak" })).StatusCode);
+
+    [Fact]
+    public async Task By_name_resolves_latest_approved_version_only()
+    {
+        var c = Client();
+        var name = Unique("byname");
+        var id = await Publish(c, name);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/catalog/by-name/myregistry/{name}")).StatusCode); // Pending : invisible
+        await c.PutAsJsonAsync($"/api/catalog/{id}/status", new { status = "Approved" });
+        var d = await c.GetFromJsonAsync<JsonElement>($"/api/catalog/by-name/myregistry/{name}");
+        Assert.Equal(id, d.GetProperty("id").GetGuid());
+        Assert.Equal("Skill", d.GetProperty("type").GetString());
+    }
 }

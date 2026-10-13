@@ -52,3 +52,12 @@
 - **PostgreSQL Flexible Server** (comme demandé : pas MySQL), Container Apps en mode `Multiple` révisions, `stickySessions` pour Blazor Server.
 - **Prod épinglée dans Git** (`prod.bicepparam`) et promue par PR ; **dev** déployée depuis le SHA du commit.
 - Bicep validé par `bicep build` uniquement ; non déployé. Voir `docs/08-gitops.md`.
+
+## 2026-10-13 — Phase 2, CLI (tranche 1)
+- **Dépendances minimales** : `fflate` pour les ZIP, `node:util.parseArgs` pour les options (pas de framework CLI). Client API écrit à la main (`cli/src/api.ts`) ; la génération depuis l'OpenAPI reste à faire.
+- **Non interactif** : `add` n'ouvre aucune invite ; l'agent cible vient de `--agent` ou de la détection (`.claude`, `.github`, `.codex`), échec si absent ou ambigu.
+- **Intégrité** : `add` compare `X-Artifact-Sha256` au hash annoncé et n'écrit rien en cas d'écart.
+- **Lockfile** : `myregistry.lock` ne contient que des chemins relatifs (versionnable). Global : `~/.myregistry/myregistry.lock`.
+- **`check`** : nommage vérifié en local (port TS de NameRules) ; secrets et validation par type via `POST /api/validate` (serveur = source de vérité, évite de dupliquer les détecteurs). Si le registre est injoignable : avertissement, seul le contrôle de nommage s'applique.
+- **Ajout API** : `GET /api/catalog/by-name/{ns}/{name}` (dernière version approuvée visible) pour résoudre un slug.
+- **Reste phase 2** : `login` (flux /cli/auth + token 1 min : l'API n'a pas encore d'auth par jeton), `edit`, `add-registry`, `completion`, surface npm `/skills/@scope/name`, hooks Claude globaux (fusion dans settings.json), assistant plugin.

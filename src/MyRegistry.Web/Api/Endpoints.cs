@@ -32,6 +32,16 @@ public static class Endpoints
             await svc.ListAsync(type, status, tag, q, sort, Rank(auth.GetCurrentUser().Role) >= Rank(Role.Moderator), page ?? 1, pageSize ?? 20))
             .WithName("CatalogList");
 
+        catalog.MapGet("/by-name/{ns}/{name}", async (string ns, string name, string? version, CatalogService svc) =>
+        {
+            var v = await svc.GetByNameAsync(ns, name, version);
+            return v is null ? Results.NotFound() : Results.Ok(new
+            {
+                v.Id, v.Artifact.Namespace, v.Artifact.Name, v.Artifact.Type, v.Version, v.Description, v.ContentHash,
+                Files = v.Files.Select(f => new { f.Path, f.IsBinary, Size = f.Content.Length }),
+            });
+        }).WithName("CatalogByName");
+
         catalog.MapGet("/{id:guid}", async (Guid id, CatalogService svc) =>
         {
             var v = await svc.GetAsync(id);
