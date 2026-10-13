@@ -1,0 +1,92 @@
+@page "/publish"
+@inject PublishService Publisher
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@L["publish"] · MyRegistry</PageTitle>
+
+<MudStack Spacing="3" Style="max-width:820px">
+    <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800">@L["publish"]</MudText>
+
+    @if (_user.Role < Role.Publisher)
+    {
+        <MudAlert Severity="Severity.Warning">Rôle Publisher requis.</MudAlert>
+    }
+    else
+    {
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="4">
+                <MudSelect T="ArtifactType" @bind-Value="_type" Label="@L["type"]" Variant="Variant.Outlined">
+                    @foreach (var t in Enum.GetValues<ArtifactType>()) { <MudSelectItem Value="t">@TypeStyle.Label(t, L.Lang == "fr")</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" sm="4"><MudTextField @bind-Value="_ns" Label="@L["namespace"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="6" sm="4"><MudTextField @bind-Value="_name" Label="@L["name"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="6" sm="4"><MudTextField @bind-Value="_version" Label="@L["version"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="6" sm="8"><MudTextField @bind-Value="_fileName" Label="@L["filename"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_description" Label="@L["description"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_tags" Label="@L["tags"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12">
+                <MudFileUpload T="IBrowserFile" FilesChanged="OnFile" Accept=".md,.json">
+                    <ActivatorContent><MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile">@L["load_file"]</MudButton></ActivatorContent>
+                </MudFileUpload>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_content" Label="@L["content"]" Variant="Variant.Outlined" Lines="14" Style="font-family:monospace" />
+            </MudItem>
+        </MudGrid>
+
+        <MudButton OnClick="Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" Size="Size.Large">@L["publish"]</MudButton>
+
+        @if (_result is { Success: false })
+        {
+            <MudAlert Severity="Severity.Error">
+                <b>@L["refused"]</b>
+                @if (_result.CanonicalName is not null) { <div>@L["canonical"] : <code>@_result.CanonicalName</code></div> }
+                @foreach (var e in _result.Errors)
+                {
+                    <div><code>@e.Code</code> @e.Message @(e.File is null ? "" : $"({e.File}{(e.Line is null ? "" : ":" + e.Line)})")</div>
+                }
+            </MudAlert>
+        }
+        @if (_result is { Warnings.Count: > 0 })
+        {
+            <MudAlert Severity="Severity.Warning">
+                <b>@L["warnings"]</b>
+                @foreach (var w in _result.Warnings) { <div><code>@w.Code</code> @w.Message</div> }
+            </MudAlert>
+        }
+    }
+</MudStack>
+
+@code {
+    private ArtifactType _type = ArtifactType.Skill;
+    private string _ns = "myregistry", _name = "", _version = "", _fileName = "SKILL.md", _description = "", _tags = "", _content = "";
+    private bool _busy;
+    private ImportResult? _result;
+    private CurrentUser _user = default!;
+
+    protected override void OnInitialized() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; }
+
+    private async Task OnFile(IBrowserFile f)
+    {
+        _fileName = f.Name;
+        using var r = new StreamReader(f.OpenReadStream(1_000_000));
+        _content = await r.ReadToEndAsync();
+    }
+
+    private async Task Submit()
+    {
+        _busy = true;
+        var tags = _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        _result = await Publisher.ImportAsync(new ImportRequest(_type, _ns, _name, string.IsNullOrWhiteSpace(_version) ? null : _version,
+            _description, _fileName, _content, tags), _user);
+        _busy = false;
+        if (_result.Success) Nav.NavigateTo($"/artifact/{_result.VersionId}");
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

@@ -1,21 +1,27 @@
 @inherits LayoutComponentBase
 @inject Localizer L
+@implements IDisposable
 
-<MudThemeProvider @bind-IsDarkMode="_dark" />
+<MudThemeProvider @bind-IsDarkMode="_dark" Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudText Typo="Typo.h6">MyRegistry</MudText>
+    <MudAppBar Elevation="0" Color="Color.Transparent" Style="background:#10211C !important;color:#fff !important">
+        <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit">
+            <MudText Typo="Typo.h6" Style="font-weight:800;letter-spacing:-0.02em">
+                <span style="background:#C6F24E;color:#10211C;border-radius:8px;padding:2px 8px;margin-right:8px">M</span>MyRegistry
+            </MudText>
+        </MudLink>
         <MudSpacer />
+        <MudButton Href="/publish" Variant="Variant.Filled" Style="background:#C6F24E;color:#10211C" Class="mr-2">@L["publish"]</MudButton>
         <MudButton Color="Color.Inherit" OnClick="L.Toggle" aria-label="@L["lang"]">@(L.Lang == "fr" ? "EN" : "FR")</MudButton>
         <MudIconButton Icon="@(_dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        Color="Color.Inherit" OnClick="() => _dark = !_dark" aria-label="@L["theme"]" />
     </MudAppBar>
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="my-6 px-4">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-6 px-4">
             @Body
         </MudContainer>
     </MudMainContent>
@@ -23,6 +29,14 @@
 
 @code {
     private bool _dark;
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight { Primary = "#10211C", Background = "#EEF1EC", Surface = "#FFFFFF", AppbarBackground = "#10211C" },
+        PaletteDark = new PaletteDark { Primary = "#C6F24E", Background = "#0A1612", Surface = "#10211C" },
+        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "14px" },
+    };
 
-    protected override void OnInitialized() => L.Changed += () => InvokeAsync(StateHasChanged);
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    protected override void OnInitialized() => L.Changed += OnChanged;
+    public void Dispose() => L.Changed -= OnChanged;
 }

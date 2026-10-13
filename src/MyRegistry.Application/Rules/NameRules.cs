@@ -23,7 +23,11 @@ public static class NameRules
     };
 
     public static string Canonicalize(string s) =>
-        Regex.Replace(s.Trim().ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+        Regex.Replace(RemoveDiacritics(s.Trim()).ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+
+    private static string RemoveDiacritics(string s) =>
+        new string(s.Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
 
     public static NameCheck Check(string ns, string name, ArtifactType type, bool creation)
     {

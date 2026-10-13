@@ -48,7 +48,7 @@ if (!app.Environment.IsEnvironment("Testing"))
     await Seeder.MigrateAndSeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());
 }
 
-app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAntiforgery();
 
 // Liveness : sans dépendance. Readiness : vérifie la base.

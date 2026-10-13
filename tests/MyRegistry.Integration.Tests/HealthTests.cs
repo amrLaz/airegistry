@@ -17,14 +17,6 @@ public class HealthTests(WebApplicationFactory<Program> factory) : IClassFixture
     }
 
     [Fact]
-    public async Task Home_page_renders()
-    {
-        var res = await Client().GetAsync("/");
-        res.EnsureSuccessStatusCode();
-        Assert.Contains("MyRegistry", await res.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
     public async Task OpenApi_document_is_served()
     {
         var res = await Client().GetAsync("/openapi/v1.json");

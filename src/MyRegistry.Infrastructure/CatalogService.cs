@@ -86,6 +86,18 @@ public class CatalogService(AppDbContext db)
         return true;
     }
 
+    public Task<int> VoteCountAsync(Guid artifactId, CancellationToken ct = default) =>
+        db.Votes.CountAsync(v => v.ArtifactId == artifactId, ct);
+
+    /// <summary>Bascule le vote de l'utilisateur ; renvoie le total ou null si la version n'existe pas.</summary>
+    public async Task<int?> ToggleVoteAsync(Guid versionId, string userId, CancellationToken ct = default)
+    {
+        var artifactId = await db.Versions.Where(v => v.Id == versionId).Select(v => (Guid?)v.ArtifactId).FirstOrDefaultAsync(ct);
+        if (artifactId is null) return null;
+        var has = await db.Votes.AnyAsync(v => v.ArtifactId == artifactId && v.UserId == userId, ct);
+        return await VoteAsync(versionId, userId, !has, ct);
+    }
+
     public async Task<int?> VoteAsync(Guid versionId, string userId, bool add, CancellationToken ct = default)
     {
         var artifactId = await db.Versions.Where(v => v.Id == versionId).Select(v => (Guid?)v.ArtifactId).FirstOrDefaultAsync(ct);

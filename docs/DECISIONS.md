@@ -31,3 +31,10 @@
 ## 2026-10-13 — Mode local SQLite
 - Sans `MYREGISTRY_DB_CONNECTION`, l'application démarre sur SQLite (`myregistry-local.db`) pour tourner sans Docker ni Postgres. Schéma créé par `EnsureCreated` (pas de migrations). Réservé au développement : la production et la CI visent PostgreSQL.
 - Recherche catalogue rendue portable (`ToLower().Contains`) au lieu de `ILike`.
+
+## 2026-10-13 — UI catalogue (tranche 3)
+- Pages Blazor : `/` (catalogue : recherche, filtre par famille, tri, cartes colorées par type), `/artifact/{id}` (fiche : commande d'installation, SHA-256, historique, upvote, approuver/déprécier pour Moderator+), `/publish` (formulaire + chargement de fichier). Maquettes : artifact Design de la session.
+- Les composants appellent `CatalogService`/`PublishService` (pas de logique métier dans les composants).
+- `MapStaticAssets()` à la place de `UseStaticFiles()`. En local, lancer avec le profil par défaut (`dotnet run`, environnement Development) pour que les assets MudBlazor soient servis.
+- Les tags sont désaccentués (`sécurité` → `securite`) par `NameRules.Canonicalize`.
+- Reste de la phase 1 : signalements/commentaires, export/audit-prompt, `suggested-version`, page Mes Publications.

@@ -1,0 +1,111 @@
+@page "/artifact/{Id:guid}"
+@inject CatalogService Svc
+@inject Localizer L
+@inject IAuthProvider Auth
+@implements IDisposable
+
+<MudStack Spacing="4">
+    <MudLink Href="/" Color="Color.Secondary">← @L["back"]</MudLink>
+
+    @if (_v is null)
+    {
+        <MudAlert Severity="Severity.Warning">@L["not_found"]</MudAlert>
+    }
+    else
+    {
+        <PageTitle>@_v.Artifact.Name · MyRegistry</PageTitle>
+        <MudPaper Style="background:#10211C;color:#E8EFE6;padding:32px;border-radius:24px">
+            <MudStack Spacing="2">
+                <MudStack Row Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                    <MudChip T="string" Style="@($"background:{TypeStyle.Color(_v.Artifact.Type)};color:#fff")">@TypeStyle.Label(_v.Artifact.Type, L.Lang == "fr")</MudChip>
+                    <MudChip T="string" Color="@TypeStyle.StatusColor(_v.Status)">@_v.Status</MudChip>
+                    @if (_v.Quarantined) { <MudChip T="string" Color="Color.Error">Quarantaine</MudChip> }
+                </MudStack>
+                <MudText Typo="Typo.caption" Style="font-family:monospace;color:#8DA396">@_v.Artifact.Namespace/</MudText>
+                <MudText Typo="Typo.h2" Component="@("h1")" Style="font-weight:800;letter-spacing:-0.03em;margin-top:-8px">@_v.Artifact.Name <span style="font-size:.4em;font-family:monospace;color:#C6F24E">v@(_v.Version)</span></MudText>
+                <MudText>@_v.Description</MudText>
+                <div style="font-family:monospace;background:#0A1612;border:1px solid #2B4339;border-radius:12px;padding:14px 16px;color:#C6F24E;overflow-x:auto;white-space:nowrap">
+                    $ myregistry add @_v.Artifact.Name@@@_v.Version
+                </div>
+                <MudStack Row Spacing="2" Wrap="Wrap.Wrap">
+                    <MudButton Href="@($"/api/catalog/{_v.Id}/download")" Variant="Variant.Filled" Style="background:#C6F24E;color:#10211C">@L["download"]</MudButton>
+                    <MudButton OnClick="Vote" Variant="Variant.Outlined" Style="color:#E8EFE6;border-color:#2B4339">▲ @_votes</MudButton>
+                    @if (_user.Role >= Role.Moderator && _v.Status != VersionStatus.Approved)
+                    {
+                        <MudButton OnClick="@(() => SetStatus(VersionStatus.Approved))" Color="Color.Success" Variant="Variant.Filled">@L["approve"]</MudButton>
+                    }
+                    @if (_user.Role >= Role.Moderator && _v.Status == VersionStatus.Approved)
+                    {
+                        <MudButton OnClick="@(() => SetStatus(VersionStatus.Deprecated))" Color="Color.Warning" Variant="Variant.Outlined">@L["deprecate"]</MudButton>
+                    }
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4 mb-3">
+                    <MudText Typo="Typo.h6">@L["files"]</MudText>
+                    @foreach (var f in _v.Files.OrderBy(f => f.Path))
+                    {
+                        <div style="display:flex;justify-content:space-between;border-top:1px dashed #CBD5CC;padding:10px 0;font-family:monospace;font-size:14px">
+                            <span style="overflow-wrap:anywhere">@f.Path</span><span>@FormatSize(f.Content.Length)</span>
+                        </div>
+                    }
+                </MudPaper>
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6">@L["history"]</MudText>
+                    @foreach (var h in _v.History.OrderBy(h => h.At))
+                    {
+                        <MudText Typo="Typo.body2">@h.At.ToString("yyyy-MM-dd HH:mm") · @(h.From?.ToString() ?? "—") → <b>@h.To</b> · @h.UserId @(h.Note is null ? "" : $"· {h.Note}")</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4 mb-3">
+                    <MudText Typo="Typo.h6">@L["integrity"]</MudText>
+                    <MudText Typo="Typo.caption">SHA-256</MudText>
+                    <div style="font-family:monospace;font-size:12px;background:rgba(128,128,128,.12);border-radius:8px;padding:10px;overflow-wrap:anywhere">@_v.ContentHash</div>
+                </MudPaper>
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6">@L["quality"]</MudText>
+                    <MudText Typo="Typo.h2" Style="font-weight:800">@_v.QualityGrade</MudText>
+                    <MudStack Row Wrap="Wrap.Wrap" Spacing="1">
+                        @foreach (var t in _v.Artifact.Tags) { <MudChip T="string" Size="Size.Small">#@t.Name</MudChip> }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private ArtifactVersion? _v;
+    private int _votes;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        _v = await Svc.GetAsync(Id);
+        if (_v is not null) _votes = await Svc.VoteCountAsync(_v.ArtifactId);
+    }
+
+    private async Task Vote()
+    {
+        if (_v is null) return;
+        _votes = await Svc.ToggleVoteAsync(_v.Id, _user.Email) ?? _votes;
+    }
+
+    private async Task SetStatus(VersionStatus s)
+    {
+        await Svc.SetStatusAsync(Id, s, _user.Email, null);
+        _v = await Svc.GetAsync(Id);
+    }
+
+    private static string FormatSize(int b) => b < 1024 ? $"{b} o" : $"{b / 1024.0:0.0} Ko";
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

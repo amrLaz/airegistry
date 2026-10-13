@@ -78,6 +78,16 @@ public class NameRulesTests
     }
 }
 
+public class CanonicalizeTests
+{
+    [Theory]
+    [InlineData("Sécurité", "securite")]
+    [InlineData("Pdf Extractor_v2", "pdf-extractor-v2")]
+    [InlineData("  été--lumière ", "ete-lumiere")]
+    public void Strips_accents_and_normalizes(string input, string expected) =>
+        Assert.Equal(expected, NameRules.Canonicalize(input));
+}
+
 public class NameSimilarityTests
 {
     [Theory]
