@@ -97,6 +97,9 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.Property<Guid>("ArtifactId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CommitSha")
+                        .HasColumnType("text");
+
                     b.Property<string>("ContentHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -114,6 +117,12 @@ namespace MyRegistry.Infrastructure.Migrations
 
                     b.Property<int>("DownloadCount")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("FeedId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("GitPath")
+                        .HasColumnType("text");
 
                     b.Property<string>("MainFile")
                         .HasColumnType("text");
@@ -144,6 +153,8 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ContentHash");
+
+                    b.HasIndex("FeedId");
 
                     b.HasIndex("ArtifactId", "Version")
                         .IsUnique();
@@ -212,6 +223,121 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("comments", (string)null);
+                });
+
+            modelBuilder.Entity("MyRegistry.Domain.Feed", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("ConsecutiveFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("IntervalMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("LastCommit")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("LastSyncAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("NamespaceOverride")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("PatRef")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("feeds", (string)null);
+                });
+
+            modelBuilder.Entity("MyRegistry.Domain.FeedSyncReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Commit")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Deprecated")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FeedId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Imported")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Messages")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Quarantined")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Skipped")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Unchanged")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Updated")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeedId", "StartedAt");
+
+                    b.ToTable("feed_sync_reports", (string)null);
                 });
 
             modelBuilder.Entity("MyRegistry.Domain.Governance", b =>

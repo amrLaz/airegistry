@@ -19,6 +19,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Governance> Governances => Set<Governance>();
     public DbSet<PluginDraft> PluginDrafts => Set<PluginDraft>();
     public DbSet<PluginComponent> PluginComponents => Set<PluginComponent>();
+    public DbSet<Feed> Feeds => Set<Feed>();
+    public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -47,6 +49,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.ToTable("artifact_versions");
             e.HasIndex(x => new { x.ArtifactId, x.Version }).IsUnique();
             e.HasIndex(x => x.ContentHash);
+            e.HasIndex(x => x.FeedId);
             e.Property(x => x.Version).HasMaxLength(64);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Origin).HasConversion<string>().HasMaxLength(20);
@@ -94,6 +97,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Namespace).HasMaxLength(32);
             e.Property(x => x.Name).HasMaxLength(48);
         });
+        b.Entity<Feed>(e =>
+        {
+            e.ToTable("feeds");
+            e.Property(x => x.Name).HasMaxLength(60);
+            e.Property(x => x.Kind).HasMaxLength(20);
+            e.Property(x => x.Url).HasMaxLength(500);
+            e.Property(x => x.Branch).HasMaxLength(100);
+            e.Property(x => x.PatRef).HasMaxLength(80);
+            e.Property(x => x.NamespaceOverride).HasMaxLength(32);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<FeedSyncReport>(e => { e.ToTable("feed_sync_reports"); e.HasIndex(x => new { x.FeedId, x.StartedAt }); });
         b.Entity<PluginComponent>(e =>
         {
             e.ToTable("plugin_components");
