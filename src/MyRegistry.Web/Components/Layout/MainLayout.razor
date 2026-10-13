@@ -1,0 +1,28 @@
+@inherits LayoutComponentBase
+@inject Localizer L
+
+<MudThemeProvider @bind-IsDarkMode="_dark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudText Typo="Typo.h6">MyRegistry</MudText>
+        <MudSpacer />
+        <MudButton Color="Color.Inherit" OnClick="L.Toggle" aria-label="@L["lang"]">@(L.Lang == "fr" ? "EN" : "FR")</MudButton>
+        <MudIconButton Icon="@(_dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                       Color="Color.Inherit" OnClick="() => _dark = !_dark" aria-label="@L["theme"]" />
+    </MudAppBar>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-6 px-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _dark;
+
+    protected override void OnInitialized() => L.Changed += () => InvokeAsync(StateHasChanged);
+}

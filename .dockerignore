@@ -1,0 +1,5 @@
+**/bin/
+**/obj/
+.git/
+.env
+cli/node_modules/
