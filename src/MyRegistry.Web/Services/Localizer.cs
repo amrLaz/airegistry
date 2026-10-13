@@ -139,6 +139,12 @@ public sealed class Localizer
         ["feed_delete_confirm"] = ("Cliquez encore pour supprimer le feed ET ses artefacts importés.", "Click again to delete the feed AND its imported artifacts."),
         ["feed_last_report"] = ("Dernier rapport", "Last report"),
         ["feed_ns"] = ("Namespace", "Namespace"),
+        ["ns_change"] = ("Changer le namespace", "Change namespace"),
+        ["ns_preview"] = ("Aperçu", "Preview"),
+        ["ns_apply"] = ("Appliquer", "Apply"),
+        ["ns_alias"] = ("Les anciens slugs restent valides 547 jours.", "Old slugs stay valid for 547 days."),
+        ["ns_conflict"] = ("Conflit : slug déjà pris", "Conflict: slug already taken"),
+        ["ns_done"] = ("Namespace modifié.", "Namespace changed."),
         ["tag_filter"] = ("Tag", "Tag"),
         ["status_all"] = ("Tous statuts", "Any status"),
     };

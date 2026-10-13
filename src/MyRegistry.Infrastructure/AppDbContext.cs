@@ -20,6 +20,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PluginDraft> PluginDrafts => Set<PluginDraft>();
     public DbSet<PluginComponent> PluginComponents => Set<PluginComponent>();
     public DbSet<Feed> Feeds => Set<Feed>();
+    public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -107,6 +108,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.PatRef).HasMaxLength(80);
             e.Property(x => x.NamespaceOverride).HasMaxLength(32);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<NamespaceAlias>(e =>
+        {
+            e.ToTable("namespace_aliases");
+            e.HasIndex(x => x.OldSlug);
+            e.Property(x => x.OldSlug).HasMaxLength(100);
+            e.Property(x => x.NewSlug).HasMaxLength(100);
         });
         b.Entity<FeedSyncReport>(e => { e.ToTable("feed_sync_reports"); e.HasIndex(x => new { x.FeedId, x.StartedAt }); });
         b.Entity<PluginComponent>(e =>

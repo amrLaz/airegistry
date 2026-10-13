@@ -36,6 +36,18 @@ public static class FeedEndpoints
         feeds.MapPost("/{id:guid}/sync", async (Guid id, FeedService svc, IAuthProvider auth, bool? force) =>
             await svc.SyncAsync(id, auth.GetCurrentUser().Email, force ?? false) is { } r ? Results.Ok(r) : Results.NotFound()).Require(Role.Admin).WithName("SyncFeed");
 
+        feeds.MapPost("/{id:guid}/namespace/preview", async (Guid id, NamespaceRequest body, FeedService svc) =>
+            await svc.PreviewNamespaceAsync(id, body.NamespaceOverride ?? "") is { } p ? Results.Ok(new { p.OldNamespace, p.NewNamespace, p.Items, p.Errors, canApply = p.CanApply }) : Results.NotFound())
+            .Require(Role.Admin).WithName("PreviewFeedNamespace");
+
+        feeds.MapPut("/{id:guid}/namespace", async (Guid id, NamespaceRequest body, FeedService svc, IAuthProvider auth) =>
+        {
+            var (plan, applied) = await svc.ApplyNamespaceAsync(id, body.NamespaceOverride ?? "", auth.GetCurrentUser().Email);
+            if (plan is null) return Results.NotFound();
+            return applied ? Results.Ok(new { plan.OldNamespace, plan.NewNamespace, renamed = plan.Items.Count })
+                : Results.Problem(statusCode: 409, title: "Changement de namespace impossible", extensions: new Dictionary<string, object?> { ["errors"] = plan.Errors, ["conflicts"] = plan.Items.Where(i => i.Conflict).Select(i => i.NewSlug) });
+        }).Require(Role.Admin).WithName("ApplyFeedNamespace");
+
         feeds.MapGet("/{id:guid}/reports", async (Guid id, FeedService svc) => await svc.ReportsAsync(id)).Require(Role.Admin).WithName("FeedReports");
     }
 
@@ -51,3 +63,5 @@ public sealed record FeedRequest(string Name, FeedKind Kind, string Url, string?
 {
     public FeedRules.FeedInput ToInput() => new(Name ?? "", Kind, Url ?? "", Branch, PatRef, IntervalMinutes, NamespaceOverride);
 }
+
+public sealed record NamespaceRequest(string? NamespaceOverride);
