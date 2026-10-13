@@ -55,15 +55,30 @@
         <MudIconButton Icon="@(_dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        OnClick="() => _dark = !_dark" aria-label="@L["theme"]" />
         <MudIconButton Icon="@Icons.Material.Filled.Language" OnClick="L.Toggle" aria-label="@L["lang"]" title="@(L.Lang == "fr" ? "EN" : "FR")" />
-        <MudMenu AnchorOrigin="MudBlazor.Origin.BottomRight" TransformOrigin="MudBlazor.Origin.TopRight">
-            <ActivatorContent>
-                <MudAvatar Size="Size.Small" Style="background:#0F9D8A;color:#fff;cursor:pointer">@(_user.Email.Length > 0 ? char.ToUpperInvariant(_user.Email[0]) : '?')</MudAvatar>
-            </ActivatorContent>
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Primary" AnchorOrigin="MudBlazor.Origin.BottomRight" TransformOrigin="MudBlazor.Origin.TopRight" aria-label="@_user.Email">
             <ChildContent>
                 <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">@_user.Email (@_user.Role)</MudText>
                 <MudDivider />
-                <MudMenuItem Href="/my">@L["my_pubs"]</MudMenuItem>
-                @if (_user.Role >= Role.Moderator) { <MudMenuItem Href="/admin">@L["admin"]</MudMenuItem> }
+                <MudMenuItem Href="/my" Icon="@Icons.Material.Filled.Upload">@L["my_pubs"]</MudMenuItem>
+                @if (_user.Role >= Role.Publisher) { <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Extension">@L["plugin_editor"]</MudMenuItem> }
+                @if (_user.Role >= Role.Moderator)
+                {
+                    <MudDivider Class="my-1" />
+                    <MudText Typo="Typo.overline" Class="px-4" Color="Color.Secondary">@L["admin"]</MudText>
+                    <MudMenuItem Href="/admin" Icon="@Icons.Material.Filled.Dashboard">@L["dashboard"]</MudMenuItem>
+                    <MudMenuItem Href="/admin/moderation" Icon="@Icons.Material.Filled.FactCheck">@L["moderation"]@(_pending > 0 ? $" ({_pending})" : "")</MudMenuItem>
+                    <MudMenuItem Href="/admin/security" Icon="@Icons.Material.Filled.Shield">@L["security"]</MudMenuItem>
+                    <MudMenuItem Href="/admin/reports" Icon="@Icons.Material.Filled.Flag">@L["reports"]</MudMenuItem>
+                    @if (_user.Role >= Role.Admin)
+                    {
+                        <MudMenuItem Href="/admin/users" Icon="@Icons.Material.Filled.Group">@L["users"]</MudMenuItem>
+                        <MudMenuItem Href="/admin/feeds" Icon="@Icons.Material.Filled.RssFeed">@L["feeds"]</MudMenuItem>
+                        <MudMenuItem Href="/admin/audit" Icon="@Icons.Material.Filled.History">@L["audit"]</MudMenuItem>
+                        <MudMenuItem Href="/admin/config" Icon="@Icons.Material.Filled.Settings">@L["config"]</MudMenuItem>
+                    }
+                }
+                <MudDivider Class="my-1" />
+                <MudMenuItem Href="/scalar/v1" Target="_blank" Icon="@Icons.Material.Filled.MenuBook">@L["api_docs"]</MudMenuItem>
             </ChildContent>
         </MudMenu>
     </MudAppBar>

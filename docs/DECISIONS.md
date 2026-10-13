@@ -153,3 +153,7 @@
 
 ## Menu « Créer » par type
 - Sections « Publier » (Publier un artefact, un item par type MCP/Skill/Agent/Prompt/Hook → `/publish?type=…`, Composer un plugin) et « Modifier » (Mes publications, Éditeur de plugins), infobulle « Publier ou modifier un artefact ». `/publish?type=` présélectionne le type et le nom de fichier principal par défaut.
+
+## Menu utilisateur et administration
+- Le menu avatar (activateur personnalisé) ne s'ouvrait pas : remplacé par une icône de compte. Contenu : Mes publications, Éditeur de plugins, section Administration (Tableau de bord, Modération avec compteur, Sécurité, Signalements ; Utilisateurs, Feeds, Audit, Configuration pour les Admin), Docs API.
+- Pas de « Se déconnecter » tant que l'auth OIDC n'existe pas (phase 7).

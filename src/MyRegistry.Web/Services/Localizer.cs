@@ -29,6 +29,7 @@ public sealed class Localizer
         ["publish_artifact"] = ("Publier un artefact", "Publish an artifact"),
         ["compose_plugin"] = ("Composer un plugin", "Compose a plugin"),
         ["plugin_editor"] = ("Éditeur de plugins", "Plugin editor"),
+        ["api_docs"] = ("Docs API", "API docs"),
         ["welcome"] = ("Bienvenue sur", "Welcome to"),
         ["tagline"] = ("Le registre interne des artefacts IA : serveurs MCP, skills, agents, prompts, plugins, hooks.",
                        "The internal registry for AI artifacts: MCP servers, skills, agents, prompts, plugins, hooks."),
