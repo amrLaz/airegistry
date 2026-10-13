@@ -27,7 +27,8 @@ public sealed class AzureDevOpsProvider(HttpClient http) : IGitHostProvider
 
     private static void Check(HttpResponseMessage res, string what)
     {
-        if (res.IsSuccessStatusCode) return;
+        // 203 = page de connexion HTML renvoyée à un appel sans jeton valide : ce n'est pas un succès.
+        if (res.IsSuccessStatusCode && res.StatusCode != HttpStatusCode.NonAuthoritativeInformation) return;
         throw new InvalidOperationException(res.StatusCode switch
         {
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NonAuthoritativeInformation => $"Accès Azure DevOps refusé pendant « {what} » ({(int)res.StatusCode}) : vérifiez le jeton et ses droits.",
@@ -40,7 +41,9 @@ public sealed class AzureDevOpsProvider(HttpClient http) : IGitHostProvider
     {
         using var res = await SendAsync(m, url, token, body, ct);
         Check(res, what);
-        return JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct)).RootElement.Clone();
+        var text = await res.Content.ReadAsStringAsync(ct);
+        try { return JsonDocument.Parse(text).RootElement.Clone(); }
+        catch (JsonException) { throw new InvalidOperationException($"Réponse Azure DevOps inattendue pendant « {what} » (page HTML, pas du JSON) : jeton absent ou invalide ? Renseignez « Variable du jeton » (MYREGISTRY_…) et exportez-la avant de lancer l'application."); }
     }
 
     private async Task<string> BranchHeadAsync(GitUrls.AzdoRepo r, string branch, string? token, CancellationToken ct)
