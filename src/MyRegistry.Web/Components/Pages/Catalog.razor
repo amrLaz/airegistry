@@ -7,17 +7,71 @@
 <PageTitle>MyRegistry</PageTitle>
 
 <MudStack Spacing="4">
+    @if (IsHome)
+    {
+        <div>
+            <MudText Typo="Typo.overline" Color="Color.Primary">@L["home_latest"]</MudText>
+            @if (_items.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-2">@L["empty"]</MudAlert>
+            }
+            else
+            {
+                <MudGrid Spacing="3" Class="mt-1">
+                    @foreach (var i in _items.Take(3))
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudLink Href="@($"/artifact/{i.Id}")" Underline="Underline.None" Color="Color.Inherit">
+                                <MudPaper Outlined Class="pa-4" Style="height:100%">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="@($"border-color:{TypeStyle.Color(i.Type)};color:{TypeStyle.Color(i.Type)};font-family:monospace;text-transform:uppercase")">@TypeStyle.Label(i.Type, L.Lang == "fr")</MudChip>
+                                    <MudText Typo="Typo.h6" Class="mt-2" Style="font-weight:700">@i.Namespace/@i.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">v@(i.Version)</MudText>
+                                </MudPaper>
+                            </MudLink>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </div>
+
+        <MudPaper Outlined Class="pa-6 pa-md-8">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Wrap="Wrap.Wrap" Spacing="2">
+                <div>
+                    <MudText Typo="Typo.overline" Color="Color.Primary">@L["home_categories"]</MudText>
+                    <MudText Typo="Typo.h5" Component="@("h1")" Style="font-weight:700">@L["home_choose"]</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@L["home_hint"] · @_total</MudText>
+                </div>
+            </MudStack>
+            <MudGrid Spacing="3" Class="mt-4">
+                @foreach (var t in HomeOrder)
+                {
+                    var tt = t;
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudLink Href="@($"/?type={tt}")" Underline="Underline.None" Color="Color.Inherit">
+                            <MudPaper Outlined Class="pa-5 home-card" Style="@($"height:100%;border-top:4px solid {TypeStyle.Color(tt)}")">
+                                <MudText Typo="Typo.h6" Style="font-weight:700">@TypeStyle.Plural(tt, L.Lang == "fr")</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="my-2">@L[$"desc_{tt}"]</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Primary" Style="font-weight:600">@L["explore"] →</MudText>
+                            </MudPaper>
+                        </MudLink>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudPaper>
+    }
+    else
+    {
     <div>
-        <MudText Typo="Typo.h3" Component="@("h1")" Style="font-weight:800;letter-spacing:-0.03em">@L["tagline"]</MudText>
-        <MudText Color="Color.Secondary">@_total · @L["signedin"] @_user.Email (@_user.Role)</MudText>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/" aria-label="@L["back_home"]" />
+            <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800;letter-spacing:-0.02em">
+                @(_type is { } ct ? TypeStyle.Plural(ct, L.Lang == "fr") : L["catalog"])@(string.IsNullOrWhiteSpace(_q) ? "" : $" · « {_q} »")
+            </MudText>
+        </MudStack>
+        <MudText Color="Color.Secondary">@_total</MudText>
     </div>
 
     <MudStack Row Wrap="Wrap.Wrap" Spacing="2" AlignItems="AlignItems.Center">
-        <div style="flex:1 1 320px;min-width:0">
-        <MudTextField @bind-Value="_q" Immediate DebounceInterval="250" OnDebounceIntervalElapsed="Reload" Placeholder="@L["search"]"
-                      Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      aria-label="@L["search"]" />
-        </div>
         <MudSelect T="string" Value="_sort" ValueChanged="SortChanged" Variant="Variant.Outlined" Style="max-width:200px" Label="Tri">
             <MudSelectItem Value="@("recent")">@L["sort_recent"]</MudSelectItem>
             <MudSelectItem Value="@("popular")">@L["sort_popular"]</MudSelectItem>
@@ -80,9 +134,16 @@
             }
         </MudGrid>
     }
+    }
 </MudStack>
 
 @code {
+    [SupplyParameterFromQuery(Name = "q")] public string? QueryQ { get; set; }
+    [SupplyParameterFromQuery(Name = "type")] public string? QueryType { get; set; }
+
+    private static readonly ArtifactType[] HomeOrder =
+        [ArtifactType.Agent, ArtifactType.Prompt, ArtifactType.Skill, ArtifactType.Hook, ArtifactType.Plugin, ArtifactType.McpServer];
+    private bool IsHome => string.IsNullOrWhiteSpace(_q) && _type is null && _tag is null && _status is null;
     private List<CatalogItem> _items = [];
     private int _total;
     private string? _q;
@@ -96,6 +157,12 @@
     {
         _user = Auth.GetCurrentUser();
         L.Changed += OnChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _q = QueryQ;
+        _type = Enum.TryParse<ArtifactType>(QueryType, true, out var t) ? t : null;
         await Reload();
     }
 

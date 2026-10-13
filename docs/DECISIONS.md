@@ -145,3 +145,8 @@
 - **Archive ZIP** (`ZipPackage.Read`) : au plus 200 entrées, 5 Mo décompressés au total (anti « zip bomb »), 1 Mo par fichier ; chemins absolus, `..` ou avec `:` refusés (anti « zip slip ») et rien n'est importé dans ce cas ; `__MACOSX`, `.DS_Store`, `.git`, `node_modules` ignorés ; un dossier racine unique est retiré. Les fichiers binaires partent en `binaryFiles` (base64).
 - Les fichiers sont lus **en mémoire**, jamais écrits sur le disque du serveur.
 - Pas de sélecteur de dossier natif (`webkitdirectory`) : MudBlazor ne l'expose pas ; le `.zip` couvre le besoin.
+
+## Refonte de l'accueil et de la barre du haut
+- Barre claire : logo + titre (depuis la base), recherche globale (Entrée → `/?q=…`, Ctrl/Cmd+K pour la focaliser), menu « Créer » (Publier, Plugins), cloche = nombre d'artefacts Pending (modérateurs, lien vers la modération), thème, langue, menu avatar (Mes publications, Administration).
+- Accueil sans filtre : bandeau des 3 derniers artefacts + cartes de familles avec description et « Explorer » (`/?type=Skill`). Avec `q`/`type`/tag/statut : liste filtrée existante.
+- Compteur de la cloche calculé dans un scope DI dédié (pas de DbContext partagé avec la page dans le circuit).

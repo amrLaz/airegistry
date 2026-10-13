@@ -12,5 +12,13 @@
     <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script>
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                var i = document.querySelector('#global-search input');
+                if (i) { e.preventDefault(); i.focus(); i.select(); }
+            }
+        });
+    </script>
 </body>
 </html>

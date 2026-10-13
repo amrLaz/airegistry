@@ -3,6 +3,8 @@
 @implements IDisposable
 @inject IAuthProvider Auth
 @inject SettingsCache Settings
+@inject NavigationManager Nav
+@inject IServiceScopeFactory Scopes
 
 <MudThemeProvider @bind-IsDarkMode="_dark" Theme="_theme" />
 <MudPopoverProvider />
@@ -10,26 +12,60 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="0" Color="Color.Transparent" Style="background:#10211C !important;color:#fff !important">
-        <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit">
-            <MudText Typo="Typo.h6" Style="font-weight:800;letter-spacing:-0.02em">
-                <span style="background:#C6F24E;color:#10211C;border-radius:8px;padding:2px 8px;margin-right:8px">@(_title.Length > 0 ? char.ToUpperInvariant(_title[0]) : 'M')</span>@_title
-            </MudText>
+    <MudAppBar Elevation="0" Color="Color.Surface" Class="app-bar" Style="border-bottom:1px solid var(--mud-palette-lines-default)">
+        <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit" Class="mr-4">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                <span style="background:#0F9D8A;color:#fff;border-radius:10px;padding:6px 10px;font-weight:800;line-height:1">@Initial</span>
+                <MudText Typo="Typo.subtitle1" Class="d-none d-sm-flex" Style="font-weight:800;letter-spacing:-0.02em;color:#0F9D8A">@_title</MudText>
+            </MudStack>
         </MudLink>
+
+        <div id="global-search" style="flex:1 1 120px;max-width:640px;min-width:0">
+            <MudTextField @bind-Value="_q" Immediate="true" Placeholder="@L["search_global"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="border-radius:999px" OnKeyDown="OnSearchKey" aria-label="@L["search_global"]" Class="my-0" />
+        </div>
         <MudSpacer />
-        @if (_user.Role >= Role.Moderator)
-        {
-            <MudButton Href="/admin" Color="Color.Inherit" Class="mr-1">@L["admin"]</MudButton>
-        }
+
         @if (_user.Role >= Role.Publisher)
         {
-            <MudButton Href="/plugins" Color="Color.Inherit" Class="mr-1">@L["plugins"]</MudButton>
+            <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
+            <MudMenu Icon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Style="background:#0F9D8A;color:#fff" Class="mr-1" aria-label="@L["create"]">
+                <MudMenuItem Href="/publish">@L["publish"]</MudMenuItem>
+                <MudMenuItem Href="/plugins">@L["plugins"]</MudMenuItem>
+            </MudMenu>
+            </MudHidden>
+            <MudHidden Breakpoint="Breakpoint.Xs">
+            <MudMenu Label="@L["create"]" StartIcon="@Icons.Material.Filled.Add" EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                     Variant="Variant.Filled" Color="Color.Primary" Style="background:#0F9D8A;color:#fff;border-radius:999px" Class="mr-2">
+                <MudMenuItem Href="/publish">@L["publish"]</MudMenuItem>
+                <MudMenuItem Href="/plugins">@L["plugins"]</MudMenuItem>
+            </MudMenu>
+            </MudHidden>
         }
-        <MudButton Href="/my" Color="Color.Inherit" Class="mr-1">@L["my_pubs"]</MudButton>
-        <MudButton Href="/publish" Variant="Variant.Filled" Style="background:#C6F24E;color:#10211C" Class="mr-2">@L["publish"]</MudButton>
-        <MudButton Color="Color.Inherit" OnClick="L.Toggle" aria-label="@L["lang"]">@(L.Lang == "fr" ? "EN" : "FR")</MudButton>
+
+        @if (_user.Role >= Role.Moderator)
+        {
+            <MudTooltip Text="@(_pending > 0 ? $"{_pending} {L["pending_review"]}" : L["no_notifications"])">
+                <MudBadge Content="_pending" Visible="@(_pending > 0)" Color="Color.Error" Overlap="true" Class="mx-1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Notifications" Href="/admin/moderation" aria-label="@L["notifications"]" />
+                </MudBadge>
+            </MudTooltip>
+        }
         <MudIconButton Icon="@(_dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                       Color="Color.Inherit" OnClick="() => _dark = !_dark" aria-label="@L["theme"]" />
+                       OnClick="() => _dark = !_dark" aria-label="@L["theme"]" />
+        <MudIconButton Icon="@Icons.Material.Filled.Language" OnClick="L.Toggle" aria-label="@L["lang"]" title="@(L.Lang == "fr" ? "EN" : "FR")" />
+        <MudMenu AnchorOrigin="MudBlazor.Origin.BottomRight" TransformOrigin="MudBlazor.Origin.TopRight">
+            <ActivatorContent>
+                <MudAvatar Size="Size.Small" Style="background:#0F9D8A;color:#fff;cursor:pointer">@(_user.Email.Length > 0 ? char.ToUpperInvariant(_user.Email[0]) : '?')</MudAvatar>
+            </ActivatorContent>
+            <ChildContent>
+                <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">@_user.Email (@_user.Role)</MudText>
+                <MudDivider />
+                <MudMenuItem Href="/my">@L["my_pubs"]</MudMenuItem>
+                @if (_user.Role >= Role.Moderator) { <MudMenuItem Href="/admin">@L["admin"]</MudMenuItem> }
+            </ChildContent>
+        </MudMenu>
     </MudAppBar>
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-6 px-4">
@@ -42,14 +78,45 @@
     private bool _dark;
     private readonly MudTheme _theme = new()
     {
-        PaletteLight = new PaletteLight { Primary = "#10211C", Secondary = "#4B6258", TextPrimary = "#10211C", TextSecondary = "#4B6258", PrimaryContrastText = "#FFFFFF", Background = "#EEF1EC", Surface = "#FFFFFF", AppbarBackground = "#10211C" },
-        PaletteDark = new PaletteDark { Primary = "#C6F24E", PrimaryContrastText = "#10211C", Secondary = "#8DA396", TextPrimary = "#E8EFE6", TextSecondary = "#A9BBAE", Info = "#7DD3FC", Background = "#0A1612", Surface = "#10211C" },
+        PaletteLight = new PaletteLight { Primary = "#0F9D8A", Secondary = "#4B6258", TextPrimary = "#10211C", TextSecondary = "#4B6258", PrimaryContrastText = "#FFFFFF", Background = "#F4F7F5", Surface = "#FFFFFF", AppbarBackground = "#FFFFFF", AppbarText = "#10211C" },
+        PaletteDark = new PaletteDark { Primary = "#2DD4BF", PrimaryContrastText = "#0A1612", Secondary = "#8DA396", TextPrimary = "#E8EFE6", TextSecondary = "#A9BBAE", Info = "#7DD3FC", Background = "#0A1612", Surface = "#10211C", AppbarBackground = "#10211C", AppbarText = "#E8EFE6" },
         LayoutProperties = new LayoutProperties { DefaultBorderRadius = "14px" },
     };
 
-    private void OnChanged() => InvokeAsync(StateHasChanged);
     private CurrentUser _user = default!;
     private string _title = "MyRegistry";
-    protected override async Task OnInitializedAsync() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; _title = await Settings.TitleAsync(); }
-    public void Dispose() => L.Changed -= OnChanged;
+    private string? _q;
+    private int _pending;
+    private char Initial => _title.Length > 0 ? char.ToUpperInvariant(_title[0]) : 'M';
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        Nav.LocationChanged += OnLocation;
+        _title = await Settings.TitleAsync();
+        await LoadPending();
+    }
+
+    // Scope dédié : le DbContext du circuit est utilisé en parallèle par la page.
+    private async Task LoadPending()
+    {
+        if (_user.Role < Role.Moderator) return;
+        using var scope = Scopes.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<CatalogService>();
+        _pending = (await svc.ListAsync(null, VersionStatus.Pending, null, null, "recent", true, 1, 1)).Total;
+    }
+
+    private void OnLocation(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        InvokeAsync(async () => { await LoadPending(); StateHasChanged(); });
+
+    private void OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter") return;
+        Nav.NavigateTo(string.IsNullOrWhiteSpace(_q) ? "/" : $"/?q={Uri.EscapeDataString(_q.Trim())}");
+    }
+
+    public void Dispose() { L.Changed -= OnChanged; Nav.LocationChanged -= OnLocation; }
 }
