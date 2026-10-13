@@ -88,7 +88,21 @@
 </MudStack>
 
 @code {
+    [SupplyParameterFromQuery(Name = "type")] public string? QueryType { get; set; }
     private ArtifactType _type = ArtifactType.Skill;
+
+    protected override void OnParametersSet()
+    {
+        if (!Enum.TryParse<ArtifactType>(QueryType, true, out var t)) return;
+        _type = t;
+        if (_files.Count == 0) _fileName = DefaultFileName(t);
+    }
+
+    private static string DefaultFileName(ArtifactType t) => t switch
+    {
+        ArtifactType.Hook => "hooks.json", ArtifactType.McpServer => "mcp.json", ArtifactType.Agent => "AGENTS.md",
+        ArtifactType.Prompt => "mon-prompt.prompt.md", _ => "SKILL.md",
+    };
     private ArtifactType? _detected;
     private string _ns = "", _name = "", _version = "", _fileName = "SKILL.md", _description = "", _tags = "", _content = "";
     private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);

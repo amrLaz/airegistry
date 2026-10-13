@@ -150,3 +150,6 @@
 - Barre claire : logo + titre (depuis la base), recherche globale (Entrée → `/?q=…`, Ctrl/Cmd+K pour la focaliser), menu « Créer » (Publier, Plugins), cloche = nombre d'artefacts Pending (modérateurs, lien vers la modération), thème, langue, menu avatar (Mes publications, Administration).
 - Accueil sans filtre : bandeau des 3 derniers artefacts + cartes de familles avec description et « Explorer » (`/?type=Skill`). Avec `q`/`type`/tag/statut : liste filtrée existante.
 - Compteur de la cloche calculé dans un scope DI dédié (pas de DbContext partagé avec la page dans le circuit).
+
+## Menu « Créer » par type
+- Sections « Publier » (Publier un artefact, un item par type MCP/Skill/Agent/Prompt/Hook → `/publish?type=…`, Composer un plugin) et « Modifier » (Mes publications, Éditeur de plugins), infobulle « Publier ou modifier un artefact ». `/publish?type=` présélectionne le type et le nom de fichier principal par défaut.
