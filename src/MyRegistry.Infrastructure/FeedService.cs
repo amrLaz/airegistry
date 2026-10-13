@@ -12,12 +12,14 @@ public interface IGitProviderResolver
     IGitProvider For(FeedKind kind);
 }
 
-public sealed class GitProviderResolver(LocalGitProvider local) : IGitProviderResolver
+public sealed class GitProviderResolver(LocalGitProvider local, GitHubProvider gitHub, AzureDevOpsProvider azdo) : IGitProviderResolver
 {
     public IGitProvider For(FeedKind kind) => kind switch
     {
         FeedKind.Local => local,
-        _ => throw new NotSupportedException($"Le fournisseur {kind} n'est pas encore disponible."),
+        FeedKind.GitHub => gitHub,
+        FeedKind.AzureDevOps => azdo,
+        _ => throw new NotSupportedException($"Fournisseur inconnu : {kind}."),
     };
 }
 
@@ -173,7 +175,7 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
             var snap = await providers.For(input.Kind).ReadRepoAsync(input.Url, input.Branch, TokenFor(input.PatRef), ct);
             return (true, "Connexion réussie.", snap.HeadCommit, snap.Files.Count);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or ArgumentException or IOException)
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or ArgumentException or IOException or HttpRequestException or TaskCanceledException)
         { return (false, ex.Message, null, null); }
     }
 
@@ -196,7 +198,7 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
 
         RepoSnapshot snapshot;
         try { snapshot = await providers.For(kind).ReadRepoAsync(feed.Url, feed.Branch, TokenFor(feed.PatRef), ct); }
-        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or ArgumentException or IOException)
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or ArgumentException or IOException or HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
             feed.ConsecutiveFailures++;
             feed.LastSyncAt = DateTime.UtcNow;
@@ -218,7 +220,8 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
 
         var ns = feed.NamespaceOverride ?? FeedRules.DefaultNamespace(await RegistryNamespaceAsync(ct), kind);
         var repoName = feed.Url.TrimEnd('/').Split('/', '\\').Last().Replace(".git", "");
-        var discovered = RepoDiscovery.Discover(snapshot.Files, NameRules.Canonicalize(repoName) is { Length: > 1 } rn ? rn : "depot");
+        var files = feed.IsSystem ? snapshot.Files.Where(f => !f.Key.StartsWith("artifacts/", StringComparison.Ordinal)).ToDictionary(f => f.Key, f => f.Value) : snapshot.Files; // artifacts/ = publications internes
+        var discovered = RepoDiscovery.Discover(files, NameRules.Canonicalize(repoName) is { Length: > 1 } rn ? rn : "depot");
         var present = new HashSet<(ArtifactType, string, string)>();
 
         foreach (var d in discovered)

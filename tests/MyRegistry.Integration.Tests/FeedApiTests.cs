@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MyRegistry.Integration.Tests;
 
@@ -220,6 +221,10 @@ public class FeedApiTests(DbFixture db) : IDisposable
         {
             var sysId = (await sys.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
             Assert.Equal(HttpStatusCode.Conflict, (await Admin().DeleteAsync($"/api/feeds/{sysId}")).StatusCode);
+            using var scope = db.Factory.Services.CreateScope(); // nettoyage : l'API refuse de supprimer un feed système
+            var ctx = scope.ServiceProvider.GetRequiredService<MyRegistry.Infrastructure.AppDbContext>();
+            ctx.Feeds.RemoveRange(ctx.Feeds.Where(f => f.Id == sysId));
+            await ctx.SaveChangesAsync();
         }
         else Assert.Contains("système", await sys.Content.ReadAsStringAsync()); // un feed système existe déjà (autre test)
     }
@@ -251,16 +256,14 @@ public class FeedApiTests(DbFixture db) : IDisposable
     }
 
     [Fact]
-    public async Task GitHub_and_AzureDevOps_providers_are_reported_as_not_yet_available_and_count_as_failures()
+    public async Task Provider_kinds_get_their_default_namespace_suffix_and_interval()
     {
-        var res = await Admin().PostAsJsonAsync("/api/feeds", new { name = U("gh"), kind = "GitHub", url = "https://github.com/org/repo" });
-        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
-        var feed = await res.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("myregistry-gh", feed.GetProperty("effectiveNamespace").GetString());
-        Assert.Equal(1440, feed.GetProperty("intervalMinutes").GetInt32());
-        var r = await Sync(feed.GetProperty("id").GetGuid());
-        Assert.False(r.GetProperty("success").GetBoolean());
-        Assert.Contains("pas encore disponible", string.Join(" ", r.GetProperty("messages").EnumerateArray().Select(x => x.GetString())));
+        var gh = await (await Admin().PostAsJsonAsync("/api/feeds", new { name = U("gh"), kind = "GitHub", url = "https://github.com/org/repo" })).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("myregistry-gh", gh.GetProperty("effectiveNamespace").GetString());
+        Assert.Equal(1440, gh.GetProperty("intervalMinutes").GetInt32());
+        var az = await (await Admin().PostAsJsonAsync("/api/feeds", new { name = U("az"), kind = "AzureDevOps", url = "https://dev.azure.com/o/p/_git/r" })).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("myregistry-azd", az.GetProperty("effectiveNamespace").GetString());
+        Assert.Equal(60, az.GetProperty("intervalMinutes").GetInt32());
     }
 
     [Fact]

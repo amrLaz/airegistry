@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using MyRegistry.Application.Rules;
 
 namespace MyRegistry.Application;
 
@@ -67,4 +68,53 @@ public static class MarketplaceSnapshot
 
     public static string Digest(string manifestJson) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(manifestJson))).ToLowerInvariant();
+}
+
+
+public sealed record NewPullRequest(string BaseBranch, string SourceBranch, IReadOnlyDictionary<string, byte[]> Files, string Title, string Description);
+public sealed record PullRequestInfo(int Id, string Url, string SourceBranch);
+
+/// <summary>Fournisseur avec écriture : branche, commit et pull request (Azure DevOps).</summary>
+public interface IGitHostProvider : IGitProvider
+{
+    /// <summary>Contenu actuel de fichiers précis sur une branche (absents omis) : sert à refuser une PR vide.</summary>
+    Task<IReadOnlyDictionary<string, byte[]>> ReadFilesAsync(string repoUrl, string branch, IEnumerable<string> paths, string? token, CancellationToken ct = default);
+
+    Task<PullRequestInfo> CreatePullRequestAsync(string repoUrl, NewPullRequest request, string? token, CancellationToken ct = default);
+
+    /// <summary>Fusionne la PR en squash et supprime la branche source.</summary>
+    Task CompletePullRequestAsync(string repoUrl, int pullRequestId, string? token, CancellationToken ct = default);
+
+    /// <summary>Ferme la PR sans fusionner.</summary>
+    Task AbandonPullRequestAsync(string repoUrl, int pullRequestId, string? token, CancellationToken ct = default);
+}
+
+public static class GitUrls
+{
+    public sealed record GitHubRepo(string Owner, string Repo);
+    public sealed record AzdoRepo(string Org, string Project, string Repo);
+
+    public static GitHubRepo? ParseGitHub(string url)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(url.Trim(), @"^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(\.git)?/?$");
+        return m.Success ? new(m.Groups[1].Value, m.Groups[2].Value) : null;
+    }
+
+    public static AzdoRepo? ParseAzdo(string url)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(url.Trim(), @"^https://dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s]+?)/?$");
+        return m.Success ? new(Uri.UnescapeDataString(m.Groups[1].Value), Uri.UnescapeDataString(m.Groups[2].Value), Uri.UnescapeDataString(m.Groups[3].Value)) : null;
+    }
+
+    /// <summary>Branche de publication d'une version interne : artifact/{ns}/{name}/{version}-{id} (docs/06).</summary>
+    public static string PublicationBranch(string ns, string name, string version, Guid id) =>
+        $"artifact/{ns}/{name}/{NameRules0.Safe(version)}-{id.ToString("N")[..8]}";
+
+    /// <summary>Chemin des fichiers d'un artefact interne dans le dépôt de gouvernance.</summary>
+    public static string ArtifactFolder(string ns, string name) => $"artifacts/{ns}/{name}";
+
+    private static class NameRules0
+    {
+        public static string Safe(string v) => System.Text.RegularExpressions.Regex.Replace(v, "[^A-Za-z0-9._-]", "-");
+    }
 }

@@ -24,7 +24,7 @@ public sealed record ValidationReport(
 
 public sealed record ImportResult(
     bool Success, Guid? VersionId, string? Version, bool AutoBumped, string? Grade, string? ContentHash,
-    string? CanonicalName, IReadOnlyList<Issue> Errors, IReadOnlyList<Issue> Warnings, IReadOnlyList<string> Notes);
+    string? CanonicalName, IReadOnlyList<Issue> Errors, IReadOnlyList<Issue> Warnings, IReadOnlyList<string> Notes, string? PullRequestUrl = null);
 
 public static class ContentHasher
 {

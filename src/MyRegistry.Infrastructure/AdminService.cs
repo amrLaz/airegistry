@@ -12,7 +12,7 @@ public sealed record ReportRow(Guid Id, Guid VersionId, string Artifact, string 
 public sealed record Dashboard(int Artifacts, int Versions, Dictionary<string, int> ByStatus, Dictionary<string, int> ByType,
     int Quarantined, int OpenReports, int Users, IReadOnlyList<AuditDto> Recent, int ReviewsDue);
 
-public class AdminService(AppDbContext db, MarketplaceCache marketplace)
+public class AdminService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests)
 {
     // ---- Utilisateurs ----
     public async Task<IReadOnlyList<UserDto>> UsersAsync(CancellationToken ct = default) =>
@@ -92,6 +92,7 @@ public class AdminService(AppDbContext db, MarketplaceCache marketplace)
     {
         var v = await db.Versions.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (v is null) return false;
+        await pullRequests.OnTransitionAsync(v, VersionStatus.Deprecated, ct); // ferme la PR ouverte ; un échec Git ne bloque pas le rejet
         db.StatusHistory.Add(new StatusHistory { VersionId = id, From = v.Status, To = VersionStatus.Deprecated, UserId = actor, Note = "rejected: " + reason });
         v.Status = VersionStatus.Deprecated;
         marketplace.Invalidate();

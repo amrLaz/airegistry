@@ -216,3 +216,35 @@ public class NamespaceRenameTests
     [InlineData("old-gh")]
     public void Invalid_or_unchanged_namespace_is_refused(string ns) => Assert.False(P(ns, [(ArtifactType.Skill, "pdf")]).CanApply);
 }
+
+public class GitUrlsTests
+{
+    [Theory]
+    [InlineData("https://github.com/org/repo", "org", "repo")]
+    [InlineData("https://github.com/org/repo.git", "org", "repo")]
+    [InlineData("https://github.com/org/my.repo-x/", "org", "my.repo-x")]
+    public void Parses_github(string url, string owner, string repo) => Assert.Equal(new GitUrls.GitHubRepo(owner, repo), GitUrls.ParseGitHub(url));
+
+    [Theory]
+    [InlineData("http://github.com/o/r")]
+    [InlineData("https://github.com/o")]
+    [InlineData("https://gitlab.com/o/r")]
+    public void Rejects_other_github_urls(string url) => Assert.Null(GitUrls.ParseGitHub(url));
+
+    [Fact] public void Parses_azure_devops_with_encoded_segments() =>
+        Assert.Equal(new GitUrls.AzdoRepo("acme", "My Project", "gov"), GitUrls.ParseAzdo("https://dev.azure.com/acme/My%20Project/_git/gov"));
+
+    [Theory]
+    [InlineData("https://dev.azure.com/acme/proj")]
+    [InlineData("https://acme.visualstudio.com/proj/_git/r")]
+    public void Rejects_other_azdo_urls(string url) => Assert.Null(GitUrls.ParseAzdo(url));
+
+    [Fact] public void Publication_branch_follows_the_documented_pattern()
+    {
+        var id = Guid.Parse("12345678-aaaa-bbbb-cccc-1234567890ab");
+        Assert.Equal("artifact/myregistry/pdf/1.2.0-12345678", GitUrls.PublicationBranch("myregistry", "pdf", "1.2.0", id));
+        Assert.Equal("artifact/myregistry/pdf/1.2.0-rc-1-12345678", GitUrls.PublicationBranch("myregistry", "pdf", "1.2.0 rc/1", id)); // aucun caractère dangereux dans le nom de branche
+    }
+
+    [Fact] public void Artifact_folder() => Assert.Equal("artifacts/myregistry/pdf", GitUrls.ArtifactFolder("myregistry", "pdf"));
+}

@@ -48,7 +48,7 @@ public static class Endpoints
             return v is null ? Results.NotFound() : Results.Ok(new
             {
                 v.Id, v.Artifact.Namespace, v.Artifact.Name, v.Artifact.Type, v.Version, v.Description, v.Status, v.Quarantined,
-                Grade = v.QualityGrade, v.ContentHash, v.CreatedBy, v.CreatedAt, v.DownloadCount,
+                Grade = v.QualityGrade, v.ContentHash, v.CreatedBy, v.CreatedAt, v.DownloadCount, v.PrUrl, v.PrState, Origin = v.Origin.ToString(),
                 Tags = v.Artifact.Tags.Select(t => t.Name),
                 Files = v.Files.Select(f => new { f.Path, f.IsBinary, Size = f.Content.Length }),
                 History = v.History.OrderBy(h => h.At).Select(h => new { h.From, h.To, h.UserId, h.At, h.Note }),
@@ -80,7 +80,12 @@ public static class Endpoints
             .Require(Role.Reader).WithName("RemoveUpvote");
 
         catalog.MapPut("/{id:guid}/status", async (Guid id, StatusRequest body, CatalogService svc, IAuthProvider auth) =>
-            await svc.SetStatusAsync(id, body.Status, auth.GetCurrentUser().Email, body.Note) ? Results.NoContent() : Results.NotFound())
+            await svc.TransitionAsync(id, body.Status, auth.GetCurrentUser().Email, body.Note) switch
+            {
+                (false, _) => Results.NotFound(),
+                (true, { } error) => Results.Problem(statusCode: 502, title: "Le statut n'a pas été modifié", detail: error),
+                _ => Results.NoContent(),
+            })
             .Require(Role.Moderator).WithName("SetStatus");
 
         catalog.MapPost("/{id:guid}/report", async (Guid id, ReportRequest body, CommunityService svc, IAuthProvider auth) =>

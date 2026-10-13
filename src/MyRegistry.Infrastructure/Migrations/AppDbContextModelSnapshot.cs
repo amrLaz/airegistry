@@ -132,6 +132,15 @@ namespace MyRegistry.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<int?>("PrId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PrState")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PrUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("QualityGrade")
                         .IsRequired()
                         .HasMaxLength(1)
