@@ -153,6 +153,17 @@ public class AzureDevOpsProviderTests
         Assert.All(h.Calls, c => Assert.Equal(expected, c.Auth));
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.NonAuthoritativeInformation)]
+    [InlineData(HttpStatusCode.OK)]
+    public async Task Html_sign_in_page_gives_a_clear_error_instead_of_a_json_exception(HttpStatusCode code)
+    {
+        var h = new FakeHttp().On(HttpMethod.Get, "/refs", _ => new HttpResponseMessage(code) { Content = new StringContent("\n<html>sign in</html>", Encoding.UTF8, "text/html") });
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => new AzureDevOpsProvider(new HttpClient(h)).ReadRepoAsync(Repo, "main", null));
+        Assert.DoesNotContain("invalid start of a value", ex.Message);
+        Assert.Contains("jeton", ex.Message);
+    }
+
     [Fact] public async Task Create_pull_request_branches_from_base_pushes_then_opens_the_pr_in_order()
     {
         var h = Server(new() { ["artifacts/myregistry/pdf/SKILL.md"] = "ancien" });

@@ -161,3 +161,6 @@
 ## Page de catalogue par type
 - `/?type=X` : en-tête (retour, icône + titre, description, bouton « Nouveau X », compteur d'artefacts indexés), filtres nom/auteur, tags (liste dérivée du périmètre du type), source (tous / publié ici / feed externe), statut (modération), tri ; cartes avec type, provenance, statut/quarantaine, votes, version, date et auteur.
 - `CatalogItem` expose `Author` et `Origin` (ajouts rétro-compatibles) ; `ListAsync` accepte un filtre `origin` optionnel. « Feed interne » de la maquette = `Origin.Internal`.
+
+## Azure DevOps sans jeton valide
+- Un appel sans jeton valide renvoie 203 + page HTML de connexion : traité comme un refus d'accès (avant, `JsonException` brute). Toute réponse non JSON donne un message explicite (renseigner « Variable du jeton » MYREGISTRY_… et l'exporter avant de lancer l'appli).
