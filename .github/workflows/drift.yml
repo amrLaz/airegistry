@@ -1,0 +1,42 @@
+# Détection de dérive : si l'état réel diffère de Git (changement manuel dans le portail), le job échoue.
+name: Drift detection
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  drift:
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.env == 'prod' && 'main' || 'develop' }}
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if et comptage des écarts
+        env:
+          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+        run: |
+          az deployment group what-if \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --parameters "infra/params/${{ matrix.env }}.bicepparam" \
+            --no-pretty-print -o json > whatif.json
+          n=$(jq '[.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore")] | length' whatif.json)
+          echo "Écarts détectés : $n"
+          if [ "$n" -gt 0 ]; then
+            jq -r '.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore") | "\(.changeType) \(.resourceId)"' whatif.json
+            exit 1
+          fi

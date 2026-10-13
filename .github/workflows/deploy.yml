@@ -1,0 +1,88 @@
+# GitOps : l'état déployé est celui décrit dans Git.
+#  - develop -> environnement dev : image construite depuis le commit, déploiement automatique.
+#  - main    -> environnement prod : déploie le tag ÉPINGLÉ dans infra/params/prod.bicepparam (promotion par PR).
+name: Deploy
+on:
+  push:
+    branches: [develop, main]
+    paths-ignore: ['docs/**', '**/*.md']
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC vers Azure : aucun secret Azure stocké dans GitHub
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: github.ref_name == 'develop'
+    uses: ./.github/workflows/ci.yml
+
+  build-image:
+    if: github.ref_name == 'develop'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: meta
+        run: |
+          echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "acr=$(grep -oP "param acrName = '\K[^']+" infra/params/dev.bicepparam)" >> "$GITHUB_OUTPUT"
+      - name: Build et push (az acr build, sans Docker local)
+        run: az acr build --registry "${{ steps.meta.outputs.acr }}" --image "myregistry-web:${{ steps.meta.outputs.tag }}" --file Dockerfile .
+
+  deploy-dev:
+    if: github.ref_name == 'develop'
+    needs: build-image
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Déployer l'état décrit dans Git
+        env:
+          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+        run: |
+          az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --parameters infra/params/dev.bicepparam \
+            --parameters imageTag="${{ needs.build-image.outputs.tag }}"
+
+  deploy-prod:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: prod   # approbation manuelle configurée sur l'environnement GitHub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Vérifier que l'image épinglée existe
+        run: |
+          acr=$(grep -oP "param acrName = '\K[^']+" infra/params/prod.bicepparam)
+          tag=$(grep -oP "param imageTag = '\K[^']+" infra/params/prod.bicepparam)
+          az acr repository show --name "$acr" --image "myregistry-web:$tag" > /dev/null
+      - name: Déployer l'état décrit dans Git
+        env:
+          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+        run: |
+          az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --parameters infra/params/prod.bicepparam

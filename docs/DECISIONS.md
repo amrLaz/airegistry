@@ -46,3 +46,9 @@
 - **Commentaires** : limités à 2000 caractères, rattachés à l'artefact (pas à la version) ; pas encore de modération des commentaires (champ `Hidden` prêt).
 - **Fichier SQLite local** : créé dans `src/MyRegistry.Web/` (dossier du projet), pas dans le dossier courant.
 - **Phase 1 : reste** : recherche globale (Ctrl+K), `archive` installable, fork, contenu brut sans HTML via `/api/artifacts/{id}/raw`.
+
+## 2026-10-13 — Approche GitOps
+- **GitHub Actions** (le dépôt est sur GitHub) à la place d'un pipeline Azure DevOps ; OIDC vers Azure, aucun secret Azure stocké.
+- **PostgreSQL Flexible Server** (comme demandé : pas MySQL), Container Apps en mode `Multiple` révisions, `stickySessions` pour Blazor Server.
+- **Prod épinglée dans Git** (`prod.bicepparam`) et promue par PR ; **dev** déployée depuis le SHA du commit.
+- Bicep validé par `bicep build` uniquement ; non déployé. Voir `docs/08-gitops.md`.
