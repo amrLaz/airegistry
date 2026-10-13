@@ -31,6 +31,10 @@ public class ArtifactVersion
     public Guid? FeedId { get; set; }
     public string? GitPath { get; set; }
     public string? CommitSha { get; set; }
+    /// <summary>Pull request de gouvernance (publication interne) : id, URL et état (Open | Merged | Abandoned).</summary>
+    public int? PrId { get; set; }
+    public string? PrUrl { get; set; }
+    public string? PrState { get; set; }
     public string CreatedBy { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public int DownloadCount { get; set; }

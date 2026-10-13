@@ -10,7 +10,7 @@ public sealed record CatalogItem(Guid Id, string Namespace, string Name, Artifac
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
-public class CatalogService(AppDbContext db, MarketplaceCache marketplace)
+public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests)
 {
     public async Task<PagedResult<CatalogItem>> ListAsync(ArtifactType? type, VersionStatus? status, string? tag, string? q, string? sort,
         bool includeNonPublic, int page, int pageSize, CancellationToken ct = default)
@@ -93,16 +93,21 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace)
         return ms.ToArray();
     }
 
-    public async Task<bool> SetStatusAsync(Guid id, VersionStatus to, string userId, string? note, CancellationToken ct = default)
+    public async Task<bool> SetStatusAsync(Guid id, VersionStatus to, string userId, string? note, CancellationToken ct = default) =>
+        (await TransitionAsync(id, to, userId, note, ct)).Found;
+
+    /// <summary>Change le statut. L'effet Git (fusion/fermeture de la PR) passe avant : s'il échoue, le statut ne change pas.</summary>
+    public async Task<(bool Found, string? Error)> TransitionAsync(Guid id, VersionStatus to, string userId, string? note, CancellationToken ct = default)
     {
         var v = await db.Versions.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (v is null) return false;
+        if (v is null) return (false, null);
+        if (await pullRequests.OnTransitionAsync(v, to, ct) is { } error) return (true, error);
         db.StatusHistory.Add(new StatusHistory { VersionId = id, From = v.Status, To = to, UserId = userId, Note = note });
         v.Status = to;
         marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = userId, Action = "status", Entity = "ArtifactVersion", EntityId = id.ToString(), Details = to.ToString() });
         await db.SaveChangesAsync(ct);
-        return true;
+        return (true, null);
     }
 
     public Task<int> VoteCountAsync(Guid artifactId, CancellationToken ct = default) =>

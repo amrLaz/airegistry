@@ -24,6 +24,8 @@
                     <MudChip T="string" Style="@($"background:{TypeStyle.Color(_v.Artifact.Type)};color:#fff")">@TypeStyle.Label(_v.Artifact.Type, L.Lang == "fr")</MudChip>
                     <MudChip T="string" Color="@TypeStyle.StatusColor(_v.Status)">@_v.Status</MudChip>
                     @if (_v.Quarantined) { <MudChip T="string" Color="Color.Error">@L["quarantine"]</MudChip> }
+                    @if (_v.Origin == Origin.External) { <MudChip T="string" Color="Color.Info" Size="Size.Small">External</MudChip> }
+                    @if (_v.PrUrl is not null) { <MudChip T="string" Size="Size.Small" Href="@_v.PrUrl" Target="_blank" Icon="@Icons.Material.Filled.CallMerge">PR · @_v.PrState</MudChip> }
                 </MudStack>
                 <MudText Typo="Typo.caption" Style="font-family:monospace;color:#8DA396">@_v.Artifact.Namespace/</MudText>
                 <MudText Typo="Typo.h2" Component="@("h1")" Style="font-weight:800;letter-spacing:-0.03em;margin-top:-8px">@_v.Artifact.Name <span style="font-size:.4em;font-family:monospace;color:#C6F24E">v@(_v.Version)</span></MudText>

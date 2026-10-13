@@ -5,7 +5,7 @@ using MyRegistry.Domain;
 
 namespace MyRegistry.Infrastructure;
 
-public class PublishService(AppDbContext db)
+public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests)
 {
     public async Task<ImportResult> ImportAsync(ImportRequest req, CurrentUser user, CancellationToken ct = default)
     {
@@ -36,12 +36,23 @@ public class PublishService(AppDbContext db)
         var decision = VersionRules.Resolve(req.Version, existing?.Versions.Select(v => v.Version) ?? []);
         if (decision.Error is not null) return Fail([new("version-duplicate", decision.Error)]);
 
+        // Publication par pull request : n'aboutit que si la PR est créée (un échec Git annule la publication).
+        var versionId = Guid.NewGuid();
+        PullRequestInfo? pr = null;
+        if (await pullRequests.SystemTargetAsync(ct) is { } target)
+        {
+            try { pr = await pullRequests.OpenAsync(target, req.Namespace, req.Name, decision.Version, versionId, files, user.Email, ct); }
+            catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException or ArgumentException)
+            { return Fail([new("pull-request", $"La pull request de gouvernance n'a pas pu être créée : {ex.Message}")], report.Warnings); }
+        }
+
         var artifact = existing ?? new Artifact { Namespace = req.Namespace, Name = req.Name, Type = req.Type };
         if (existing is null) db.Artifacts.Add(artifact);
 
         var version = new ArtifactVersion
         {
-            Artifact = artifact, Version = decision.Version, Description = req.Description,
+            Id = versionId, Artifact = artifact, Version = decision.Version, Description = req.Description,
+            PrId = pr?.Id, PrUrl = pr?.Url, PrState = pr is null ? null : "Open",
             ContentHash = ContentHasher.Hash(files), QualityGrade = report.Grade, MainFile = PayloadBuilder.Normalize(req.FileName),
             CreatedBy = user.Email, Status = VersionStatus.Pending,
             Files = files.Select(f => new VersionFile { Path = f.Path, Content = f.Content, IsBinary = f.IsBinary }).ToList(),
@@ -61,7 +72,7 @@ public class PublishService(AppDbContext db)
         await db.SaveChangesAsync(ct);
 
         return new(true, version.Id, version.Version, decision.AutoBumped, version.QualityGrade, version.ContentHash,
-            null, [], report.Warnings, notes);
+            null, [], report.Warnings, notes, pr?.Url);
     }
 
     private static ImportResult Fail(IReadOnlyList<Issue> errors, IReadOnlyList<Issue>? warnings = null, string? canonical = null) =>
