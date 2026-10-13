@@ -6,7 +6,7 @@ using MyRegistry.Domain;
 namespace MyRegistry.Infrastructure;
 
 public sealed record CatalogItem(Guid Id, string Namespace, string Name, ArtifactType Type, string Version, string? Description,
-    VersionStatus Status, bool Quarantined, string Grade, string ContentHash, int Votes, int Downloads, string[] Tags, DateTime CreatedAt);
+    VersionStatus Status, bool Quarantined, string Grade, string ContentHash, int Votes, int Downloads, string[] Tags, DateTime CreatedAt, string Author = "", Origin Origin = Origin.Internal);
 
 public sealed record TransitionResult(bool Found, string? Error, string? Kind);
 
@@ -15,7 +15,7 @@ public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page,
 public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests, SecurityService security)
 {
     public async Task<PagedResult<CatalogItem>> ListAsync(ArtifactType? type, VersionStatus? status, string? tag, string? q, string? sort,
-        bool includeNonPublic, int page, int pageSize, CancellationToken ct = default)
+        bool includeNonPublic, int page, int pageSize, Origin? origin = null, CancellationToken ct = default)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -25,6 +25,7 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
         if (!includeNonPublic) versions = versions.Where(v => v.Status == VersionStatus.Approved && !v.Quarantined);
         else if (status is not null) versions = versions.Where(v => v.Status == status);
         if (type is not null) versions = versions.Where(v => v.Artifact.Type == type);
+        if (origin is not null) versions = versions.Where(v => v.Origin == origin);
         if (!string.IsNullOrWhiteSpace(tag)) versions = versions.Where(v => v.Artifact.Tags.Any(t => t.Name == tag));
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -40,7 +41,7 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
 
         var items = latest.Select(v => new CatalogItem(v.Id, v.Artifact.Namespace, v.Artifact.Name, v.Artifact.Type, v.Version, v.Description,
             v.Status, v.Quarantined, v.QualityGrade, v.ContentHash, votes.GetValueOrDefault(v.ArtifactId), v.DownloadCount,
-            v.Artifact.Tags.Select(t => t.Name).OrderBy(n => n).ToArray(), v.CreatedAt));
+            v.Artifact.Tags.Select(t => t.Name).OrderBy(n => n).ToArray(), v.CreatedAt, v.CreatedBy, v.Origin));
 
         items = sort == "popular" ? items.OrderByDescending(i => i.Votes).ThenByDescending(i => i.CreatedAt) : items.OrderByDescending(i => i.CreatedAt);
         var list = items.ToList();

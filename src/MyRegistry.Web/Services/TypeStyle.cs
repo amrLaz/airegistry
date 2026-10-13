@@ -17,6 +17,13 @@ public static class TypeStyle
         ArtifactType.Plugin => "Plugin", _ => "Hook",
     };
 
+    public static string Icon(ArtifactType t) => t switch
+    {
+        ArtifactType.McpServer => MudBlazor.Icons.Material.Filled.Dns, ArtifactType.Skill => MudBlazor.Icons.Material.Filled.Psychology,
+        ArtifactType.Agent => MudBlazor.Icons.Material.Filled.SmartToy, ArtifactType.Prompt => MudBlazor.Icons.Material.Filled.Chat,
+        ArtifactType.Plugin => MudBlazor.Icons.Material.Filled.Extension, _ => MudBlazor.Icons.Material.Filled.Webhook,
+    };
+
     public static string Plural(ArtifactType t, bool fr) => t == ArtifactType.McpServer ? (fr ? "Serveurs MCP" : "MCP servers") : Label(t, fr) + "s";
 
     public static MudBlazor.Color StatusColor(VersionStatus s) => s switch
