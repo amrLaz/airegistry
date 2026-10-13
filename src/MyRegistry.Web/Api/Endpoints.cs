@@ -82,8 +82,9 @@ public static class Endpoints
         catalog.MapPut("/{id:guid}/status", async (Guid id, StatusRequest body, CatalogService svc, IAuthProvider auth) =>
             await svc.TransitionAsync(id, body.Status, auth.GetCurrentUser().Email, body.Note) switch
             {
-                (false, _) => Results.NotFound(),
-                (true, { } error) => Results.Problem(statusCode: 502, title: "Le statut n'a pas été modifié", detail: error),
+                { Found: false } => Results.NotFound(),
+                { Error: { } error, Kind: "security" } => Results.Problem(statusCode: 409, title: "Approbation bloquée par l'analyse de sécurité", detail: error),
+                { Error: { } error } => Results.Problem(statusCode: 502, title: "Le statut n'a pas été modifié", detail: error),
                 _ => Results.NoContent(),
             })
             .Require(Role.Moderator).WithName("SetStatus");

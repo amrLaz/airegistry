@@ -8,9 +8,11 @@ namespace MyRegistry.Infrastructure;
 public sealed record CatalogItem(Guid Id, string Namespace, string Name, ArtifactType Type, string Version, string? Description,
     VersionStatus Status, bool Quarantined, string Grade, string ContentHash, int Votes, int Downloads, string[] Tags, DateTime CreatedAt);
 
+public sealed record TransitionResult(bool Found, string? Error, string? Kind);
+
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
-public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests)
+public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests, SecurityService security)
 {
     public async Task<PagedResult<CatalogItem>> ListAsync(ArtifactType? type, VersionStatus? status, string? tag, string? q, string? sort,
         bool includeNonPublic, int page, int pageSize, CancellationToken ct = default)
@@ -97,17 +99,23 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
         (await TransitionAsync(id, to, userId, note, ct)).Found;
 
     /// <summary>Change le statut. L'effet Git (fusion/fermeture de la PR) passe avant : s'il échoue, le statut ne change pas.</summary>
-    public async Task<(bool Found, string? Error)> TransitionAsync(Guid id, VersionStatus to, string userId, string? note, CancellationToken ct = default)
+    public async Task<TransitionResult> TransitionAsync(Guid id, VersionStatus to, string userId, string? note, CancellationToken ct = default)
     {
         var v = await db.Versions.FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (v is null) return (false, null);
-        if (await pullRequests.OnTransitionAsync(v, to, ct) is { } error) return (true, error);
+        if (v is null) return new(false, null, null);
+        // Porte de sécurité : High/Critical non exclus ni dérogés bloquent l'approbation, y compris pour un Admin.
+        if (to == VersionStatus.Approved && v.Status != VersionStatus.Approved)
+        {
+            var gate = await security.EvaluateApprovalAsync(id, ct);
+            if (!gate.Allowed) return new(true, gate.Reason, "security");
+        }
+        if (await pullRequests.OnTransitionAsync(v, to, ct) is { } error) return new(true, error, "git");
         db.StatusHistory.Add(new StatusHistory { VersionId = id, From = v.Status, To = to, UserId = userId, Note = note });
         v.Status = to;
         marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = userId, Action = "status", Entity = "ArtifactVersion", EntityId = id.ToString(), Details = to.ToString() });
         await db.SaveChangesAsync(ct);
-        return (true, null);
+        return new(true, null, null);
     }
 
     public Task<int> VoteCountAsync(Guid artifactId, CancellationToken ct = default) =>

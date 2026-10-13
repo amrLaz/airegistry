@@ -41,11 +41,14 @@ builder.Services.AddSingleton<IGitProvider>(sp => sp.GetRequiredService<LocalGit
 builder.Services.AddHttpClient<GitHubProvider>(c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient<AzureDevOpsProvider>(c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<IGitProviderResolver, GitProviderResolver>();
+builder.Services.AddSingleton<IScanner, StaticScanner>();
+builder.Services.AddScoped<SecurityService>();
 builder.Services.AddScoped<FeedService>();
 builder.Services.AddScoped<PullRequestWorkflow>();
 builder.Services.AddSingleton<IJobLock>(_ => string.IsNullOrWhiteSpace(connection) ? new InProcessLock() : new PostgresAdvisoryLock(connection));
 builder.Services.AddSingleton<IBackgroundJob, FeedSyncJob>();
 builder.Services.AddSingleton<IBackgroundJob, SnapshotJob>();
+builder.Services.AddSingleton<IBackgroundJob, SecurityRescanJob>();
 builder.Services.AddSingleton<JobExecutor>();
 // Les jobs ne tournent pas en test ni si MYREGISTRY_JOBS=off (ex. un réplica dédié à l'interface).
 if (!builder.Environment.IsEnvironment("Testing") && !string.Equals(builder.Configuration["JOBS"], "off", StringComparison.OrdinalIgnoreCase))
@@ -103,6 +106,7 @@ app.MapApi();
 app.MapAdminApi();
 app.MapPluginApi();
 app.MapFeedApi();
+app.MapSecurityApi();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

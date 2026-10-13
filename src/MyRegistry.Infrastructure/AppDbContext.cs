@@ -20,6 +20,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PluginDraft> PluginDrafts => Set<PluginDraft>();
     public DbSet<PluginComponent> PluginComponents => Set<PluginComponent>();
     public DbSet<Feed> Feeds => Set<Feed>();
+    public DbSet<SecurityScan> Scans => Set<SecurityScan>();
+    public DbSet<SecurityFinding> Findings => Set<SecurityFinding>();
+    public DbSet<SecurityWaiver> Waivers => Set<SecurityWaiver>();
+    public DbSet<ScanBaseline> Baselines => Set<ScanBaseline>();
     public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
 
@@ -109,6 +113,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.NamespaceOverride).HasMaxLength(32);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
         });
+        b.Entity<SecurityScan>(e =>
+        {
+            e.ToTable("security_scans");
+            e.HasIndex(x => new { x.VersionId, x.StartedAt });
+            e.HasIndex(x => x.RunId);
+            e.Property(x => x.ContentHash).HasMaxLength(64);
+            e.Property(x => x.Mode).HasMaxLength(20);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Verdict).HasMaxLength(20);
+            e.Property(x => x.ToolVersion).HasMaxLength(40);
+            e.HasMany(x => x.Findings).WithOne().HasForeignKey(f => f.ScanId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<SecurityFinding>(e => { e.ToTable("security_findings"); e.Property(x => x.RuleId).HasMaxLength(60); e.Property(x => x.Message).HasMaxLength(300); });
+        b.Entity<SecurityWaiver>(e => { e.ToTable("security_waivers"); e.HasIndex(x => x.VersionId); e.Property(x => x.ContentHash).HasMaxLength(64); e.Property(x => x.Reason).HasMaxLength(1000); });
+        b.Entity<ScanBaseline>(e => { e.ToTable("scan_baseline"); e.Property(x => x.Sha256).HasMaxLength(64); });
         b.Entity<NamespaceAlias>(e =>
         {
             e.ToTable("namespace_aliases");

@@ -29,7 +29,7 @@ public sealed record FeedReportDto(Guid Id, DateTime StartedAt, DateTime? EndedA
     int Skipped, int Deprecated, int Quarantined, IReadOnlyList<string> Messages);
 public sealed record FeedResult(FeedDto? Feed, IReadOnlyList<Issue> Errors, bool NotFound, bool Conflict = false);
 
-public class FeedService(AppDbContext db, IGitProviderResolver providers, SettingsService settings, MarketplaceCache marketplace)
+public class FeedService(AppDbContext db, IGitProviderResolver providers, SettingsService settings, MarketplaceCache marketplace, SecurityService security)
 {
     // ---------- CRUD ----------
     private async Task<string> RegistryNamespaceAsync(CancellationToken ct) => await settings.GetAsync(SettingKeys.DefaultNamespace, "myregistry", ct);
@@ -223,6 +223,7 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
         var files = feed.IsSystem ? snapshot.Files.Where(f => !f.Key.StartsWith("artifacts/", StringComparison.Ordinal)).ToDictionary(f => f.Key, f => f.Value) : snapshot.Files; // artifacts/ = publications internes
         var discovered = RepoDiscovery.Discover(files, NameRules.Canonicalize(repoName) is { Length: > 1 } rn ? rn : "depot");
         var present = new HashSet<(ArtifactType, string, string)>();
+        var created = new List<Guid>();
 
         foreach (var d in discovered)
         {
@@ -230,17 +231,19 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
             var check = NameRules.Check(ns, name, d.Type, creation: false); // la règle « nom contenant son type » ne vaut que pour une création interne
             if (!check.IsValid) { report.Skipped++; messages.Add($"Ignoré {d.GitPath} ({d.RawName}) : {string.Join(" ", check.Errors.Select(e => e.Message))}"); continue; }
             present.Add((d.Type, name, d.GitPath));
-            await ImportOneAsync(feed, ns, name, d, snapshot.HeadCommit, report, messages, ct);
+            await ImportOneAsync(feed, ns, name, d, snapshot.HeadCommit, report, messages, created, ct);
         }
 
         await DeprecateAbsentAsync(feed, present, report, messages, ct);
 
         feed.ConsecutiveFailures = 0; feed.LastCommit = snapshot.HeadCommit; feed.LastSyncAt = DateTime.UtcNow; feed.Status = FeedStatus.Ok;
         marketplace.Invalidate();
-        return await FinishAsync(report, feed, success: true, snapshot.HeadCommit, messages, actor, ct);
+        var finished = await FinishAsync(report, feed, success: true, snapshot.HeadCommit, messages, actor, ct);
+        foreach (var id in created) await security.ScanVersionAsync(id, "feed", $"feed:{feed.Name}", null, null, ct); // analyse des versions importées
+        return finished;
     }
 
-    private async Task ImportOneAsync(Feed feed, string ns, string name, DiscoveredArtifact d, string commit, FeedSyncReport report, List<string> messages, CancellationToken ct)
+    private async Task ImportOneAsync(Feed feed, string ns, string name, DiscoveredArtifact d, string commit, FeedSyncReport report, List<string> messages, List<Guid> created, CancellationToken ct)
     {
         var files = d.Files.Select(f => new FilePayload(f.Key, f.Value, f.Value.Contains((byte)0))).ToList();
         var hash = ContentHasher.Hash(files);
@@ -294,6 +297,7 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
         };
         v.History.Add(new StatusHistory { To = VersionStatus.ToReview, UserId = $"feed:{feed.Name}", Note = quarantine ? "feed-import:quarantine" : "feed-import" });
         db.Versions.Add(v);
+        created.Add(v.Id);
         if (latest is null) report.Imported++; else report.Updated++;
         if (quarantine) { report.Quarantined++; if (validation.Errors.Any(e => e.Code == "secret-detected")) messages.Add($"Quarantaine {d.GitPath} : secret détecté ({string.Join(", ", validation.Errors.Where(e => e.Code == "secret-detected").Select(e => $"{e.File}:{e.Line}"))})."); }
     }

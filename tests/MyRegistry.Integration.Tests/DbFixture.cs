@@ -25,7 +25,7 @@ public sealed class DbFixture : IAsyncLifetime
         var env = Environment.GetEnvironmentVariable("MYREGISTRY_TEST_DB");
         if (env is null)
         {
-            _container = new PostgreSqlBuilder().WithImage("postgres:16").Build();
+            _container = new PostgreSqlBuilder("postgres:16").Build();
             await _container.StartAsync();
             _admin = _container.GetConnectionString();
         }

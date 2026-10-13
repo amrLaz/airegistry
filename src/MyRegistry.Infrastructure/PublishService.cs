@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using MyRegistry.Application;
 using MyRegistry.Application.Rules;
@@ -5,7 +6,7 @@ using MyRegistry.Domain;
 
 namespace MyRegistry.Infrastructure;
 
-public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests)
+public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests, SecurityService security, Microsoft.Extensions.Logging.ILogger<PublishService> log)
 {
     public async Task<ImportResult> ImportAsync(ImportRequest req, CurrentUser user, CancellationToken ct = default)
     {
@@ -35,6 +36,20 @@ public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests)
 
         var decision = VersionRules.Resolve(req.Version, existing?.Versions.Select(v => v.Version) ?? []);
         if (decision.Error is not null) return Fail([new("version-duplicate", decision.Error)]);
+
+        // Analyse de sécurité directe, obligatoire avant la publication interne (si activée). Échec ou indisponibilité = refus avec une référence,
+        // sans détail technique côté client (le détail est journalisé).
+        ScanOutcome? scan = null;
+        if (await security.IsEnabledAsync(ct))
+        {
+            scan = await security.ScanFilesAsync(files, req.Type, ct);
+            if (scan.Status != ScanStatus.Succeeded)
+            {
+                var reference = Guid.NewGuid().ToString("N")[..8];
+                log.LogError("Analyse de sécurité {Ref} en échec ({Status}) : {Error}", reference, scan.Status, scan.Error);
+                return Fail([new("scan-unavailable", $"L'analyse de sécurité n'a pas pu être réalisée (réf. {reference}) : publication refusée. Réessayez plus tard.")], report.Warnings);
+            }
+        }
 
         // Publication par pull request : n'aboutit que si la PR est créée (un échec Git annule la publication).
         var versionId = Guid.NewGuid();
@@ -70,6 +85,7 @@ public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests)
 
         db.Audit.Add(new AuditEntry { UserId = user.Email, Action = "import", Entity = "ArtifactVersion", EntityId = version.Id.ToString(), Details = $"{req.Namespace}/{req.Name}@{version.Version}" });
         await db.SaveChangesAsync(ct);
+        if (scan is not null) await security.RecordDirectScanAsync(version, scan, ct);
 
         return new(true, version.Id, version.Version, decision.AutoBumped, version.QualityGrade, version.ContentHash,
             null, [], report.Warnings, notes, pr?.Url);

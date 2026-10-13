@@ -53,7 +53,9 @@ public static class SettingsRules
                     errors.Add(new(k, "URL publique invalide (http ou https).")); break;
                 case SettingKeys.MarketplaceRepo when v.Length > 0 && RepoLocation.ToLocalPath(v) is null:
                     errors.Add(new(k, "Dépôt du snapshot : chemin absolu ou file:///chemin (les dépôts distants arrivent en phase 5).")); break;
-                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo):
+                case SettingKeys.SecurityScanEnabled when v is not ("true" or "false"):
+                    errors.Add(new(k, "Valeur attendue : true ou false.")); break;
+                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo or SettingKeys.SecurityScanEnabled):
                     errors.Add(new(k, "Réglage inconnu.")); break;
             }
         }
