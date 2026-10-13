@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: myregistry
+      POSTGRES_USER: myregistry
+      POSTGRES_PASSWORD: myregistry
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myregistry"]
+      interval: 5s
+      retries: 10
+  web:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      MYREGISTRY_DB_CONNECTION: Host=db;Port=5432;Database=myregistry;Username=myregistry;Password=myregistry
+    ports: ["8080:8080"]
+    volumes: ["appdata:/data"]
+volumes:
+  pgdata:
+  appdata:

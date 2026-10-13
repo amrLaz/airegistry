@@ -1,0 +1,6 @@
+.env
+bin/
+obj/
+node_modules/
+dist/
+docs/reference/screenshots/
