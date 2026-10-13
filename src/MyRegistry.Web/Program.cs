@@ -26,8 +26,12 @@ builder.Services.AddSingleton(new DevAuthOptions
 {
     Email = builder.Configuration["DEV_USER_EMAIL"] ?? "dev@example.com",
     Role = Enum.TryParse<Role>(builder.Configuration["DEV_USER_ROLE"], true, out var r) ? r : Role.Admin,
+    AllowImpersonation = !string.Equals(builder.Configuration["AUTH_MODE"], "oidc", StringComparison.OrdinalIgnoreCase),
 });
-builder.Services.AddScoped<IAuthProvider, DevAuthProvider>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUserDirectory, UserDirectory>();
+builder.Services.AddScoped<IAuthProvider, HttpDevAuthProvider>();
+builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();
@@ -72,6 +76,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
 }).WithName("RegistryInfo");
 
 app.MapApi();
+app.MapAdminApi();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

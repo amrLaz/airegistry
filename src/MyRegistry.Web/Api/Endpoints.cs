@@ -8,13 +8,13 @@ namespace MyRegistry.Web.Api;
 public static class Endpoints
 {
     // Hiérarchie des droits : docs/01 (SecurityValidator ⊇ Moderator ; Admin ⊇ tout).
-    private static int Rank(Role r) => r switch { Role.Reader => 0, Role.Publisher => 1, Role.Moderator => 2, Role.SecurityValidator => 3, _ => 4 };
+    internal static int Rank(Role r) => r switch { Role.Reader => 0, Role.Publisher => 1, Role.Moderator => 2, Role.SecurityValidator => 3, _ => 4 };
 
-    private static RouteHandlerBuilder Require(this RouteHandlerBuilder b, Role min) =>
+    internal static RouteHandlerBuilder Require(this RouteHandlerBuilder b, Role min) =>
         b.AddEndpointFilter(async (ctx, next) =>
         {
             var user = ctx.HttpContext.RequestServices.GetRequiredService<IAuthProvider>().GetCurrentUser();
-            return Rank(user.Role) >= Rank(min) ? await next(ctx) : Results.Problem(statusCode: 403, title: "Droits insuffisants", detail: $"Rôle requis : {min}.");
+            return user.IsAuthenticated && Rank(user.Role) >= Rank(min) ? await next(ctx) : Results.Problem(statusCode: 403, title: "Droits insuffisants", detail: $"Rôle requis : {min}.");
         });
 
     private static IResult Problem(ImportResult r) =>

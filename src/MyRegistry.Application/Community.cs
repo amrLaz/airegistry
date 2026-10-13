@@ -10,9 +10,9 @@ public static class QuarantinePolicy
     public const int Threshold = 5;
     public static readonly TimeSpan Window = TimeSpan.FromHours(1);
 
-    /// <summary>≥ 5 signalements dans la dernière heure → quarantaine automatique (docs/05).</summary>
-    public static bool ShouldQuarantine(IEnumerable<DateTime> reportTimes, DateTime now) =>
-        reportTimes.Count(t => now - t <= Window) >= Threshold;
+    /// <summary>≥ 5 signalements d'utilisateurs distincts dans la dernière heure → quarantaine automatique (docs/05).</summary>
+    public static bool ShouldQuarantine(IEnumerable<(string UserId, DateTime At)> reports, DateTime now) =>
+        reports.Where(r => now - r.At <= Window).Select(r => r.UserId).Distinct().Count() >= Threshold;
 }
 
 public sealed record ExportFile(string Path, string Content);
