@@ -58,6 +58,30 @@ else
                     }
                 </MudStack>
             </MudStack>
+            @if (!ff.IsSystem)
+            {
+                <MudExpansionPanels Class="mt-2" Elevation="0">
+                    <MudExpansionPanel Text="@L["ns_change"]">
+                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                            <MudTextField @bind-Value="_newNs" Label="@L["feed_ns"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:260px" />
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => PreviewNs(ff.Id)">@L["ns_preview"]</MudButton>
+                            @if (_plan is not null && _planFeed == ff.Id && _plan.CanApply)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => ApplyNs(ff.Id)">@L["ns_apply"]</MudButton>
+                            }
+                        </MudStack>
+                        @if (_plan is not null && _planFeed == ff.Id)
+                        {
+                            @foreach (var e in _plan.Errors) { <MudAlert Severity="Severity.Error" Dense Class="mt-2">@e.Message</MudAlert> }
+                            @foreach (var i in _plan.Items)
+                            {
+                                <MudText Typo="Typo.body2" Style="font-family:monospace">@i.OldSlug → @i.NewSlug @(i.Conflict ? $"⚠ {L["ns_conflict"]}" : "")</MudText>
+                            }
+                            <MudText Typo="Typo.caption">@L["ns_alias"]</MudText>
+                        }
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
             @if (_last.TryGetValue(ff.Id, out var rep))
             {
                 <MudAlert Severity="@(rep.Success ? Severity.Success : Severity.Error)" Dense Class="mt-2">
@@ -77,6 +101,9 @@ else
     private int? _interval;
     private IReadOnlyList<MyRegistry.Application.Rules.Issue> _errors = [];
     private Guid? _confirmDelete;
+    private string _newNs = "";
+    private RenamePlan? _plan;
+    private Guid? _planFeed;
     private bool _busy;
     private CurrentUser _user = default!;
 
@@ -115,6 +142,15 @@ else
         if (await Feeds.SyncAsync(id, _user.Email) is { } r) _last[id] = r;
         _feeds = await Feeds.ListAsync();
         _busy = false;
+    }
+
+    private async Task PreviewNs(Guid id) { _plan = await Feeds.PreviewNamespaceAsync(id, _newNs); _planFeed = id; }
+
+    private async Task ApplyNs(Guid id)
+    {
+        var (plan, applied) = await Feeds.ApplyNamespaceAsync(id, _newNs, _user.Email);
+        _plan = plan;
+        if (applied) { Snack.Add(L["ns_done"], Severity.Success); _plan = null; _newNs = ""; await Reload(); }
     }
 
     private async Task Reactivate(FeedDto f)
