@@ -81,4 +81,20 @@ public class UiTests(DbFixture db)
         Assert.Contains("Contrat de gouvernance", html);
         Assert.Contains("Niveau de risque", html);
     }
+
+    [Fact]
+    public async Task Plugin_pages_render_and_draft_components_are_shown()
+    {
+        var c = db.Factory.CreateClient();
+        var created = await c.PostAsJsonAsync("/api/plugins/drafts", new
+        {
+            @namespace = "myregistry", name = "ui-pack", description = "d",
+            components = new[] { new { type = "Skill", slug = "myregistry/ui-comp", version = "1.0.0" } },
+        });
+        var id = (await created.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Contains("ui-pack", await c.GetStringAsync("/plugins"));
+        var html = System.Net.WebUtility.HtmlDecode(await c.GetStringAsync($"/plugins/{id}"));
+        Assert.Contains("myregistry/ui-comp", html);
+        Assert.Contains("Composants (version exacte)", html);
+    }
 }
