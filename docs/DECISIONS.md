@@ -157,3 +157,7 @@
 ## Menu utilisateur et administration
 - Le menu avatar (activateur personnalisé) ne s'ouvrait pas : remplacé par une icône de compte. Contenu : Mes publications, Éditeur de plugins, section Administration (Tableau de bord, Modération avec compteur, Sécurité, Signalements ; Utilisateurs, Feeds, Audit, Configuration pour les Admin), Docs API.
 - Pas de « Se déconnecter » tant que l'auth OIDC n'existe pas (phase 7).
+
+## Page de catalogue par type
+- `/?type=X` : en-tête (retour, icône + titre, description, bouton « Nouveau X », compteur d'artefacts indexés), filtres nom/auteur, tags (liste dérivée du périmètre du type), source (tous / publié ici / feed externe), statut (modération), tri ; cartes avec type, provenance, statut/quarantaine, votes, version, date et auteur.
+- `CatalogItem` expose `Author` et `Origin` (ajouts rétro-compatibles) ; `ListAsync` accepte un filtre `origin` optionnel. « Feed interne » de la maquette = `Origin.Internal`.
