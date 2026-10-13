@@ -25,6 +25,9 @@ Je développe seul avec toi. Travaille par tranches verticales (API + UI + tests
 - CLI : Node 20+, TypeScript, publiée via npm (`bin: myregistry`).
 - Conteneurs : Docker, `docker compose up` lance tout en local. Déploiement cible : Azure Container Apps (plus tard).
 
+## Git (obligatoire)
+Respecte `CONTRIBUTING.md` via le skill `git-conventions` : branches `feat/`, `fix/`, `docs/`..., commits conventionnels, auteur toujours `amr.lazraq`.
+
 ## Conventions de code
 - Architecture en couches : Domain / Application / Infrastructure / Web. Pas de logique métier dans les contrôleurs ni les composants Blazor.
 - Un `IGitProvider` (Azure DevOps lecture/écriture, GitHub lecture seule). GitLab hors périmètre.
