@@ -1,0 +1,10 @@
+environment_name    = "dev"
+resource_group_name = "rg-myregistry-dev"
+acr_name            = "myregistryacr"
+acr_resource_group  = "rg-myregistry-shared"
+# Dev : le tag est injecté par le workflow deploy.yml (SHA du commit de develop) : -var image_tag=<sha>
+image_tag    = "bootstrap"
+public_url   = "https://dev.myregistry.example.com"
+auth_mode    = "oidc"
+min_replicas = 1
+max_replicas = 2
