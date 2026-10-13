@@ -25,9 +25,9 @@ public class CatalogService(AppDbContext db)
         if (!string.IsNullOrWhiteSpace(tag)) versions = versions.Where(v => v.Artifact.Tags.Any(t => t.Name == tag));
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var like = $"%{q.Trim()}%";
-            versions = versions.Where(v => EF.Functions.ILike(v.Artifact.Name, like) || EF.Functions.ILike(v.Artifact.Namespace, like)
-                || (v.Description != null && EF.Functions.ILike(v.Description, like)) || EF.Functions.ILike(v.CreatedBy, like));
+            var term = q.Trim().ToLower();
+            versions = versions.Where(v => v.Artifact.Name.ToLower().Contains(term) || v.Artifact.Namespace.ToLower().Contains(term)
+                || (v.Description != null && v.Description.ToLower().Contains(term)) || v.CreatedBy.ToLower().Contains(term));
         }
 
         var all = await versions.ToListAsync(ct);

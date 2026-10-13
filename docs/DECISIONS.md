@@ -27,3 +27,7 @@
 - **Rejets** : HTTP 422 Problem Details avec `errors` (code, message, fichier:ligne), `warnings` et `canonicalName`.
 - **Nom proche entre namespaces** : l'import réussit en `Pending` et l'historique porte la note `name-confusion`.
 - **Reste à faire en phase 1** : signalements/commentaires (API), export/audit-prompt, `suggested-version`, UI catalogue/fiche/Mes Publications.
+
+## 2026-10-13 — Mode local SQLite
+- Sans `MYREGISTRY_DB_CONNECTION`, l'application démarre sur SQLite (`myregistry-local.db`) pour tourner sans Docker ni Postgres. Schéma créé par `EnsureCreated` (pas de migrations). Réservé au développement : la production et la CI visent PostgreSQL.
+- Recherche catalogue rendue portable (`ToLower().Contains`) au lieu de `ILike`.

@@ -13,9 +13,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Config 12-factor : MYREGISTRY_DB_CONNECTION -> DB_CONNECTION, etc.
 builder.Configuration.AddEnvironmentVariables("MYREGISTRY_");
 
-var connection = builder.Configuration["DB_CONNECTION"]
-    ?? "Host=localhost;Port=5432;Database=myregistry;Username=myregistry;Password=myregistry";
-builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connection));
+// Sans MYREGISTRY_DB_CONNECTION : mode local SQLite (fichier jetable). Sinon PostgreSQL.
+var connection = builder.Configuration["DB_CONNECTION"];
+if (string.IsNullOrWhiteSpace(connection))
+{
+    var path = builder.Configuration["LOCAL_DB_PATH"] ?? "myregistry-local.db";
+    builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={path}"));
+}
+else builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connection));
 
 builder.Services.AddSingleton(new DevAuthOptions
 {
