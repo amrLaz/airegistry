@@ -5,6 +5,9 @@ namespace MyRegistry.Application;
 
 public sealed record GitCommitResult(bool Changed, string? CommitSha);
 
+/// <summary>Contenu d'un dépôt à un commit : fichiers texte et binaires de taille raisonnable (chemin relatif → octets).</summary>
+public sealed record RepoSnapshot(string HeadCommit, IReadOnlyDictionary<string, byte[]> Files, IReadOnlyList<string> Skipped);
+
 /// <summary>
 /// Fournisseur Git (docs/02 : IGitProvider). Pour l'instant : écriture de fichiers dans un dépôt local ;
 /// Azure DevOps (lecture/écriture) et GitHub (lecture seule) viendront en phase 5.
@@ -12,6 +15,9 @@ public sealed record GitCommitResult(bool Changed, string? CommitSha);
 public interface IGitProvider
 {
     /// <summary>Écrit les fichiers (chemin relatif → contenu) dans le dépôt et commit s'il y a un changement.</summary>
+    /// <summary>Lit l'état d'une branche (ou HEAD). Les fichiers trop gros sont ignorés et listés dans <c>Skipped</c>.</summary>
+    Task<RepoSnapshot> ReadRepoAsync(string repoLocation, string? branch, string? token, CancellationToken ct = default);
+
     Task<GitCommitResult> CommitFilesAsync(string repoLocation, IReadOnlyDictionary<string, string> files, string message, CancellationToken ct = default);
 }
 

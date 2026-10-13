@@ -27,6 +27,10 @@ public class ArtifactVersion
     public string QualityGrade { get; set; } = "A";
     public Origin Origin { get; set; } = Origin.Internal;
     public string? MainFile { get; set; }
+    /// <summary>Provenance Git (versions importées d'un feed).</summary>
+    public Guid? FeedId { get; set; }
+    public string? GitPath { get; set; }
+    public string? CommitSha { get; set; }
     public string CreatedBy { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public int DownloadCount { get; set; }
@@ -149,4 +153,44 @@ public class PluginComponent
     public string Slug { get; set; } = "";
     public string ExactVersion { get; set; } = "";
     public bool Resolved { get; set; }
+}
+
+public enum FeedStatus { Idle, Ok, Failed, Paused }
+
+public class Feed
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string Kind { get; set; } = "Local";
+    public string Url { get; set; } = "";
+    public string Branch { get; set; } = "main";
+    /// <summary>NOM d'une variable d'environnement contenant le jeton (jamais le jeton lui-même).</summary>
+    public string? PatRef { get; set; }
+    public int IntervalMinutes { get; set; } = 60;
+    public bool Active { get; set; } = true;
+    public bool IsSystem { get; set; }
+    public string? NamespaceOverride { get; set; }
+    public FeedStatus Status { get; set; } = FeedStatus.Idle;
+    public DateTime? LastSyncAt { get; set; }
+    public string? LastCommit { get; set; }
+    public int ConsecutiveFailures { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class FeedSyncReport
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid FeedId { get; set; }
+    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? EndedAt { get; set; }
+    public bool Success { get; set; }
+    public string? Commit { get; set; }
+    public int Imported { get; set; }
+    public int Updated { get; set; }
+    public int Unchanged { get; set; }
+    public int Skipped { get; set; }
+    public int Deprecated { get; set; }
+    public int Quarantined { get; set; }
+    /// <summary>Messages (une ligne chacun) : erreurs et éléments ignorés.</summary>
+    public string Messages { get; set; } = "";
 }

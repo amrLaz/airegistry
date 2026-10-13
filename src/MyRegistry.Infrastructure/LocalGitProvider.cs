@@ -38,6 +38,48 @@ public sealed class LocalGitProvider : IGitProvider
         finally { Gate.Release(); }
     }
 
+    public const long MaxFileBytes = 1_000_000;
+    public const int MaxFiles = 3000;
+
+    public async Task<RepoSnapshot> ReadRepoAsync(string repoLocation, string? branch, string? token, CancellationToken ct = default)
+    {
+        var path = RepoLocation.ToLocalPath(repoLocation) ?? throw new ArgumentException("Dépôt local invalide.", nameof(repoLocation));
+        if (!Directory.Exists(Path.Combine(path, ".git"))) throw new InvalidOperationException($"Aucun dépôt Git dans {path}.");
+        var rev = string.IsNullOrWhiteSpace(branch) ? "HEAD" : branch!;
+        if (rev.StartsWith('-')) throw new ArgumentException("Branche invalide.", nameof(branch));
+
+        var head = (await Git(path, ct, "rev-parse", "--verify", rev + "^{commit}")).Trim();
+        // « -l » donne la taille ; « -z » protège les noms de fichiers exotiques.
+        var listing = await Git(path, ct, "ls-tree", "-r", "-l", "-z", head);
+        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var skipped = new List<string>();
+        foreach (var entry in listing.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var tab = entry.IndexOf('\t');
+            if (tab < 0) continue;
+            var meta = entry[..tab].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var name = entry[(tab + 1)..];
+            if (meta.Length < 4 || meta[1] != "blob") continue; // pas les sous-modules ni les liens
+            if (!long.TryParse(meta[3], out var size) || size > MaxFileBytes || files.Count >= MaxFiles) { skipped.Add(name); continue; }
+            files[name] = await GitBytes(path, ct, "show", $"{head}:{name}");
+        }
+        return new(head, files, skipped);
+    }
+
+    private static async Task<byte[]> GitBytes(string workDir, CancellationToken ct, params string[] args)
+    {
+        var psi = new ProcessStartInfo("git") { WorkingDirectory = workDir, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("git introuvable.");
+        using var ms = new MemoryStream();
+        var copy = p.StandardOutput.BaseStream.CopyToAsync(ms, ct);
+        var err = p.StandardError.ReadToEndAsync(ct);
+        await copy;
+        await p.WaitForExitAsync(ct);
+        if (p.ExitCode != 0) throw new InvalidOperationException($"git {args[0]} a échoué : {(await err).Trim()}");
+        return ms.ToArray();
+    }
+
     private static async Task<string?> HeadAsync(string path, CancellationToken ct)
     {
         try { return (await Git(path, ct, "rev-parse", "HEAD")).Trim(); } catch (InvalidOperationException) { return null; }

@@ -8,6 +8,7 @@
     @if (Auth.GetCurrentUser().Role >= Role.Admin)
     {
         <MudButton Href="/admin/users" Variant="@Style("/admin/users")" Size="Size.Small">@L["users"]</MudButton>
+        <MudButton Href="/admin/feeds" Variant="@Style("/admin/feeds")" Size="Size.Small">@L["feeds"]</MudButton>
         <MudButton Href="/admin/config" Variant="@Style("/admin/config")" Size="Size.Small">@L["config"]</MudButton>
         <MudButton Href="/admin/audit" Variant="@Style("/admin/audit")" Size="Size.Small">@L["audit"]</MudButton>
     }

@@ -36,7 +36,10 @@ builder.Services.AddScoped<GovernanceService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddSingleton<MarketplaceCache>();
 builder.Services.AddScoped<PluginService>();
-builder.Services.AddSingleton<IGitProvider, LocalGitProvider>();
+builder.Services.AddSingleton<LocalGitProvider>();
+builder.Services.AddSingleton<IGitProvider>(sp => sp.GetRequiredService<LocalGitProvider>());
+builder.Services.AddSingleton<IGitProviderResolver, GitProviderResolver>();
+builder.Services.AddScoped<FeedService>();
 builder.Services.AddScoped<SnapshotService>();
 builder.Services.AddSingleton<SettingsCache>();
 builder.Services.AddScoped<Localizer>();
@@ -89,6 +92,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
 app.MapApi();
 app.MapAdminApi();
 app.MapPluginApi();
+app.MapFeedApi();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

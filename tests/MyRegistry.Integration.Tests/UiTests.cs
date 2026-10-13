@@ -64,6 +64,7 @@ public class UiTests(DbFixture db)
     [InlineData("/admin/users", "dev@example.com")]
     [InlineData("/admin/audit", "Journal d")]
     [InlineData("/admin/config", "Namespace par défaut")]
+    [InlineData("/admin/feeds", "Nouveau feed")]
     public async Task Admin_pages_render_for_admin(string url, string expected) =>
         Assert.Contains(expected, System.Net.WebUtility.HtmlDecode(await db.Factory.CreateClient().GetStringAsync(url)));
 
