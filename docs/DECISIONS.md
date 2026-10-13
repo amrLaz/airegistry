@@ -139,3 +139,9 @@
 - **Imports de feeds** : analysés après la synchronisation (mode `feed`).
 - **Interface** : panneau « Sécurité » sur la fiche (constats avec règle/fichier:ligne, dérogation, relance, prompt) et page `/admin/security` (versions bloquées, backfill + CSV, catalogue de règles, éditeur de baseline). L'approbation depuis l'interface affiche maintenant la raison du refus.
 - **Limites** : le scanner intégré est heuristique (regex) : faux positifs et faux négatifs possibles, ce n'est pas un substitut à un vrai outil ; pas d'analyse des dépendances ni du code compilé ; les fichiers binaires ou > 500 Ko sont ignorés et l'analyse est marquée « incomplète ».
+
+## 2026-10-13 — Publication multi-fichiers depuis l'interface
+- Le formulaire `/publish` n'envoyait qu'un fichier (limite de l'interface, pas du registre : l'API et la CLI gèrent déjà les dossiers). Il accepte maintenant **plusieurs fichiers ou une archive `.zip`** (un dossier se charge en le compressant). Le type et le fichier principal sont détectés (`ArtifactTypeDetector`, `ArtifactLayout.MainFile`), le nom et la description sont proposés depuis le frontmatter (ou le dossier racine du zip), et le fichier principal reste modifiable avant publication.
+- **Archive ZIP** (`ZipPackage.Read`) : au plus 200 entrées, 5 Mo décompressés au total (anti « zip bomb »), 1 Mo par fichier ; chemins absolus, `..` ou avec `:` refusés (anti « zip slip ») et rien n'est importé dans ce cas ; `__MACOSX`, `.DS_Store`, `.git`, `node_modules` ignorés ; un dossier racine unique est retiré. Les fichiers binaires partent en `binaryFiles` (base64).
+- Les fichiers sont lus **en mémoire**, jamais écrits sur le disque du serveur.
+- Pas de sélecteur de dossier natif (`webkitdirectory`) : MudBlazor ne l'expose pas ; le `.zip` couvre le besoin.

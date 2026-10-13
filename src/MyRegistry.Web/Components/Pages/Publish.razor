@@ -17,6 +17,28 @@
     }
     else
     {
+        <MudPaper Class="pa-4">
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="OnFiles" MaximumFileCount="100">
+                <ActivatorContent><MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.UploadFile">@L["load_file"]</MudButton></ActivatorContent>
+            </MudFileUpload>
+            <MudText Typo="Typo.caption" Class="d-block mt-1">@L["upload_hint"]</MudText>
+            @foreach (var e in _uploadErrors) { <MudAlert Severity="Severity.Error" Dense Class="mt-2">@e</MudAlert> }
+
+            @if (_files.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-3">@L["files_loaded"] (@_files.Count)</MudText>
+                @foreach (var f in _files.OrderBy(f => f.Key, StringComparer.Ordinal))
+                {
+                    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px dashed rgba(128,128,128,.3);padding:2px 0;font-family:monospace;font-size:13px">
+                        <span style="overflow-wrap:anywhere">@(f.Key == _fileName ? "★ " : "")@f.Key <span style="opacity:.6">(@FormatSize(f.Value.Length))</span></span>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="() => RemoveFile(f.Key)" aria-label="@L["delete"]" />
+                    </div>
+                }
+                @if (_detected is not null) { <MudChip T="string" Size="Size.Small" Color="Color.Success" Class="mt-2">@L["detected"] : @TypeStyle.Label(_detected.Value, L.Lang == "fr")</MudChip> }
+                else { <MudAlert Severity="Severity.Info" Dense Class="mt-2">@L["no_main"]</MudAlert> }
+            }
+        </MudPaper>
+
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="4">
                 <MudSelect T="ArtifactType" @bind-Value="_type" Label="@L["type"]" Variant="Variant.Outlined">
@@ -26,14 +48,17 @@
             <MudItem xs="6" sm="4"><MudTextField @bind-Value="_ns" Label="@L["namespace"]" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="6" sm="4"><MudTextField @bind-Value="_name" Label="@L["name"]" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="6" sm="4"><MudTextField @bind-Value="_version" Label="@L["version"]" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="6" sm="8"><MudTextField @bind-Value="_fileName" Label="@L["filename"]" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="6" sm="8">
+                @if (_files.Count > 0)
+                {
+                    <MudSelect T="string" Value="_fileName" ValueChanged="SetMain" Label="@L["main_file_pick"]" Variant="Variant.Outlined">
+                        @foreach (var f in _files.Keys.Where(k => !IsBinary(_files[k])).OrderBy(k => k, StringComparer.Ordinal)) { <MudSelectItem Value="@f">@f</MudSelectItem> }
+                    </MudSelect>
+                }
+                else { <MudTextField @bind-Value="_fileName" Label="@L["filename"]" Variant="Variant.Outlined" /> }
+            </MudItem>
             <MudItem xs="12"><MudTextField @bind-Value="_description" Label="@L["description"]" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12"><MudTextField @bind-Value="_tags" Label="@L["tags"]" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12">
-                <MudFileUpload T="IBrowserFile" FilesChanged="OnFile" Accept=".md,.json">
-                    <ActivatorContent><MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.UploadFile">@L["load_file"]</MudButton></ActivatorContent>
-                </MudFileUpload>
-            </MudItem>
             <MudItem xs="12">
                 <MudTextField @bind-Value="_content" Label="@L["content"]" Variant="Variant.Outlined" Lines="14" Style="font-family:monospace" />
             </MudItem>
@@ -64,26 +89,84 @@
 
 @code {
     private ArtifactType _type = ArtifactType.Skill;
+    private ArtifactType? _detected;
     private string _ns = "", _name = "", _version = "", _fileName = "SKILL.md", _description = "", _tags = "", _content = "";
+    private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
+    private List<string> _uploadErrors = [];
+    private string? _archiveRoot;
     private bool _busy;
     private ImportResult? _result;
     private CurrentUser _user = default!;
 
     protected override async Task OnInitializedAsync() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; _ns = await Settings.DefaultNamespaceAsync(); }
 
-    private async Task OnFile(IBrowserFile f)
+    private static bool IsBinary(byte[] b) => Array.IndexOf(b, (byte)0) >= 0;
+    private static string FormatSize(int b) => b < 1024 ? $"{b} o" : $"{b / 1024.0:0.0} Ko";
+
+    private async Task OnFiles(IReadOnlyList<IBrowserFile> picked)
     {
-        _fileName = f.Name;
-        using var r = new StreamReader(f.OpenReadStream(1_000_000));
-        _content = await r.ReadToEndAsync();
+        _uploadErrors = [];
+        var limits = new PackageLimits();
+        foreach (var f in picked)
+        {
+            try
+            {
+                using var ms = new MemoryStream();
+                await f.OpenReadStream(limits.MaxTotalBytes).CopyToAsync(ms);
+                var bytes = ms.ToArray();
+                if (f.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    var r = ZipPackage.Read(bytes, limits);
+                    if (r.Errors.Count > 0) { _uploadErrors.AddRange(r.Errors); continue; }
+                    _archiveRoot = ZipPackage.RootFolder(bytes);
+                    foreach (var kv in r.Files) _files[kv.Key] = kv.Value;
+                }
+                else if (bytes.Length > limits.MaxFileBytes) _uploadErrors.Add($"Fichier trop gros (> {limits.MaxFileBytes / 1000} Ko) : {f.Name}");
+                else _files[f.Name] = bytes;
+            }
+            catch (IOException) { _uploadErrors.Add($"Fichier trop gros ou illisible : {f.Name}"); }
+        }
+        Analyse();
+    }
+
+    /// <summary>Détecte le type et le fichier principal, propose un nom, et charge le fichier principal dans la zone de contenu.</summary>
+    private void Analyse()
+    {
+        _detected = ArtifactTypeDetector.Detect(_files.Keys);
+        if (_detected is { } t) { _type = t; _fileName = ArtifactLayout.MainFile(t, _files.Keys) ?? _fileName; }
+        LoadMainIntoEditor();
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            var fm = Frontmatter.Parse(_content);
+            var proposed = fm is not null && fm.TryGetValue("name", out var n) && !string.IsNullOrWhiteSpace(n) ? n : _archiveRoot ?? "";
+            _name = NameRules.Canonicalize(proposed);
+        }
+        if (string.IsNullOrWhiteSpace(_description) && Frontmatter.Parse(_content) is { } fm2 && fm2.TryGetValue("description", out var d)) _description = d;
+    }
+
+    private void LoadMainIntoEditor() =>
+        _content = _files.TryGetValue(_fileName, out var b) && !IsBinary(b) ? System.Text.Encoding.UTF8.GetString(b) : _content;
+
+    private void SetMain(string path) { _fileName = path; LoadMainIntoEditor(); }
+
+    private void RemoveFile(string path)
+    {
+        _files.Remove(path);
+        if (_files.Count == 0) { _detected = null; return; }
+        Analyse();
     }
 
     private async Task Submit()
     {
         _busy = true;
         var tags = _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Dictionary<string, string> text = new(); Dictionary<string, string> binary = new();
+        foreach (var (path, bytes) in _files.Where(f => f.Key != _fileName))
+            if (IsBinary(bytes)) binary[path] = Convert.ToBase64String(bytes); else text[path] = System.Text.Encoding.UTF8.GetString(bytes);
+
+        // Le contenu du fichier principal vient de la zone d'édition (modifiable avant publication).
         _result = await Publisher.ImportAsync(new ImportRequest(_type, _ns, _name, string.IsNullOrWhiteSpace(_version) ? null : _version,
-            _description, _fileName, _content, tags), _user);
+            _description, _fileName, _content, tags, text.Count > 0 ? text : null, binary.Count > 0 ? binary : null), _user);
         _busy = false;
         if (_result.Success) Nav.NavigateTo($"/artifact/{_result.VersionId}");
     }
