@@ -120,6 +120,49 @@ public class FeedService(AppDbContext db, IGitProviderResolver providers, Settin
         return (true, true, versions.Count, orphans.Count);
     }
 
+    // ---------- Changement de namespace (aperçu puis application) ----------
+    private async Task<(Feed? Feed, string OldNs, List<(ArtifactType Type, string Name)> Owned)> NamespaceContextAsync(Guid id, CancellationToken ct)
+    {
+        var f = await db.Feeds.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (f is null) return (null, "", []);
+        var oldNs = f.NamespaceOverride ?? FeedRules.DefaultNamespace(await RegistryNamespaceAsync(ct), Enum.Parse<FeedKind>(f.Kind));
+        // Artefacts qui appartiennent exclusivement à ce feed
+        var owned = (await db.Artifacts.AsNoTracking().Include(a => a.Versions).Where(a => a.Versions.Any(v => v.FeedId == id)).ToListAsync(ct))
+            .Where(a => a.Versions.All(v => v.FeedId == id)).Select(a => (a.Type, a.Name)).ToList();
+        return (f, oldNs, owned);
+    }
+
+    public async Task<RenamePlan?> PreviewNamespaceAsync(Guid id, string newNamespace, CancellationToken ct = default)
+    {
+        var (f, oldNs, owned) = await NamespaceContextAsync(id, ct);
+        if (f is null) return null;
+        var existing = (await db.Artifacts.AsNoTracking().Select(a => new { a.Type, a.Namespace, a.Name }).ToListAsync(ct)).Select(a => (a.Type, $"{a.Namespace}/{a.Name}"));
+        return NamespaceRename.Plan(oldNs, newNamespace.Trim(), owned, existing);
+    }
+
+    /// <summary>Applique le changement : renomme les artefacts du feed et conserve les anciens slugs en alias pendant 547 jours.</summary>
+    public async Task<(RenamePlan? Plan, bool Applied)> ApplyNamespaceAsync(Guid id, string newNamespace, string actor, CancellationToken ct = default)
+    {
+        var plan = await PreviewNamespaceAsync(id, newNamespace, ct);
+        if (plan is null || !plan.CanApply) return (plan, false);
+        var feed = await db.Feeds.FirstAsync(x => x.Id == id, ct);
+        var now = DateTime.UtcNow;
+
+        foreach (var item in plan.Items)
+        {
+            var a = await db.Artifacts.FirstAsync(x => x.Namespace == plan.OldNamespace && x.Name == item.Name && x.Type == item.Type, ct);
+            a.Namespace = plan.NewNamespace;
+            db.Aliases.Add(new NamespaceAlias { OldSlug = item.OldSlug, NewSlug = item.NewSlug, ExpiresAt = AliasRules.ExpiresAt(now) });
+        }
+        // Les alias existants qui pointaient vers l'ancien slug suivent le renommage (pas de chaîne cassée).
+        foreach (var alias in await db.Aliases.Where(x => plan.Items.Select(i => i.OldSlug).Contains(x.NewSlug)).ToListAsync(ct)) alias.NewSlug = alias.NewSlug.Replace(plan.OldNamespace + "/", plan.NewNamespace + "/");
+        feed.NamespaceOverride = plan.NewNamespace;
+        db.Audit.Add(new AuditEntry { UserId = actor, Action = "feed-namespace", Entity = "Feed", EntityId = id.ToString(), Details = $"{plan.OldNamespace} → {plan.NewNamespace} ({plan.Items.Count} artefact(s))" });
+        await db.SaveChangesAsync(ct);
+        marketplace.Invalidate();
+        return (plan, true);
+    }
+
     // ---------- Test de connexion ----------
     public async Task<(bool Ok, string Message, string? Head, int? Files)> TestConnectionAsync(FeedRules.FeedInput input, CancellationToken ct = default)
     {

@@ -383,6 +383,32 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.ToTable("governance", (string)null);
                 });
 
+            modelBuilder.Entity("MyRegistry.Domain.NamespaceAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NewSlug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("OldSlug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OldSlug");
+
+                    b.ToTable("namespace_aliases", (string)null);
+                });
+
             modelBuilder.Entity("MyRegistry.Domain.PluginComponent", b =>
                 {
                     b.Property<Guid>("Id")

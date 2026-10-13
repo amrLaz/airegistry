@@ -18,7 +18,7 @@ public sealed record PublishPluginResult(ImportResult? Import, IReadOnlyList<Iss
 public sealed record Bundle(byte[] Zip, string Sha256, string FileName);
 public sealed record MarketplaceResult(string Body, string ETag);
 
-public class PluginService(AppDbContext db, PublishService publisher, SettingsService settings, MarketplaceCache cache)
+public class PluginService(AppDbContext db, PublishService publisher, SettingsService settings, MarketplaceCache cache, CatalogService catalog)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
 
@@ -202,6 +202,7 @@ public class PluginService(AppDbContext db, PublishService publisher, SettingsSe
     // ---------- Archive installable ----------
     public async Task<Bundle?> BundleAsync(string ns, string name, string? version, CancellationToken ct = default)
     {
+        (ns, name) = await catalog.ResolveAliasAsync(ns, name, ct);
         var q = db.Versions.AsNoTracking().Include(v => v.Files).Include(v => v.Artifact)
             .Where(v => v.Artifact.Namespace == ns && v.Artifact.Name == name && v.Artifact.Type == ArtifactType.Plugin && v.Status == VersionStatus.Approved && !v.Quarantined);
         if (version is not null) q = q.Where(v => v.Version == version);

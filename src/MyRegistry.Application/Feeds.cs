@@ -135,3 +135,58 @@ public static class FeedRules
         return e;
     }
 }
+
+/// <summary>Tâche de fond planifiée. Exécutée sous verrou : sûre en multi-réplicas (docs/02, CLAUDE.md).</summary>
+public interface IBackgroundJob
+{
+    string Name { get; }
+    TimeSpan Interval { get; }
+    Task RunAsync(IServiceProvider services, CancellationToken ct);
+}
+
+/// <summary>Verrou distribué nommé. Retourne null si un autre processus tient déjà le verrou.</summary>
+public interface IJobLock
+{
+    Task<IAsyncDisposable?> TryAcquireAsync(string name, CancellationToken ct = default);
+}
+
+public static class JobSchedule
+{
+    public static bool IsDue(DateTime? lastRun, TimeSpan interval, DateTime now) => lastRun is null || now - lastRun.Value >= interval;
+    public static string LastRunKey(string jobName) => $"job_last_{jobName}";
+}
+
+public static class AliasRules
+{
+    /// <summary>Durée de conservation des anciens slugs après un changement de namespace (docs/01 : 547 jours).</summary>
+    public static readonly TimeSpan Retention = TimeSpan.FromDays(547);
+
+    public static DateTime ExpiresAt(DateTime now) => now + Retention;
+    public static bool IsActive(DateTime expiresAt, DateTime now) => now < expiresAt;
+}
+
+public sealed record RenameItem(ArtifactType Type, string Name, string OldSlug, string NewSlug, bool Conflict);
+public sealed record RenamePlan(string OldNamespace, string NewNamespace, IReadOnlyList<RenameItem> Items, IReadOnlyList<Issue> Errors)
+{
+    public bool CanApply => Errors.Count == 0 && Items.All(i => !i.Conflict);
+}
+
+public static class NamespaceRename
+{
+    /// <summary>
+    /// Aperçu d'un changement de namespace : liste les renommages et signale les conflits (slug cible déjà pris par un autre artefact
+    /// du même type). N'écrit rien : l'application se fait ensuite, après relecture.
+    /// </summary>
+    public static RenamePlan Plan(string oldNs, string newNs, IEnumerable<(ArtifactType Type, string Name)> feedArtifacts, IEnumerable<(ArtifactType Type, string Slug)> existing)
+    {
+        var errors = new List<Issue>();
+        if (newNs.Length is < 2 or > 32 || NameRules.Canonicalize(newNs) != newNs) errors.Add(new("namespace", "Namespace : 2 à 32 caractères, minuscules, chiffres, tirets simples."));
+        if (newNs == oldNs) errors.Add(new("namespace", "Le namespace est inchangé."));
+        var taken = existing.Select(e => (e.Type, e.Slug)).ToHashSet();
+        var items = feedArtifacts.OrderBy(a => a.Name, StringComparer.Ordinal)
+            .Select(a => new RenameItem(a.Type, a.Name, $"{oldNs}/{a.Name}", $"{newNs}/{a.Name}", taken.Contains((a.Type, $"{newNs}/{a.Name}"))))
+            .ToList();
+        foreach (var i in items.Where(i => i.NewSlug.Length > 64 + 1)) errors.Add(new("combined-length", $"{i.NewSlug} dépasse la longueur autorisée."));
+        return new(oldNs, newNs, items, errors);
+    }
+}

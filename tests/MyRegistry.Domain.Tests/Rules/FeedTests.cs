@@ -166,3 +166,53 @@ public class FeedValidationTests
         Assert.Equal(1440, FeedRules.DefaultInterval(FeedKind.GitHub));
     }
 }
+
+public class JobAndAliasRulesTests
+{
+    private static readonly DateTime Now = new(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc);
+
+    [Fact] public void Never_run_job_is_due() => Assert.True(JobSchedule.IsDue(null, TimeSpan.FromHours(6), Now));
+    [Fact] public void Job_is_due_only_after_its_interval()
+    {
+        Assert.False(JobSchedule.IsDue(Now.AddHours(-5), TimeSpan.FromHours(6), Now));
+        Assert.True(JobSchedule.IsDue(Now.AddHours(-6), TimeSpan.FromHours(6), Now));
+    }
+    [Fact] public void Last_run_key_is_stable() => Assert.Equal("job_last_feed-sync", JobSchedule.LastRunKey("feed-sync"));
+
+    [Fact] public void Aliases_live_547_days()
+    {
+        Assert.Equal(TimeSpan.FromDays(547), AliasRules.Retention);
+        var exp = AliasRules.ExpiresAt(Now);
+        Assert.True(AliasRules.IsActive(exp, Now.AddDays(546)));
+        Assert.False(AliasRules.IsActive(exp, Now.AddDays(547)));
+    }
+}
+
+public class NamespaceRenameTests
+{
+    private static RenamePlan P(string newNs, (ArtifactType, string)[] feed, params (ArtifactType, string)[] existing) =>
+        NamespaceRename.Plan("old-gh", newNs, feed, existing);
+
+    [Fact] public void Lists_every_rename_with_old_and_new_slug()
+    {
+        var plan = P("acme", [(ArtifactType.Skill, "pdf"), (ArtifactType.Agent, "rev")]);
+        Assert.True(plan.CanApply);
+        Assert.Equal(["old-gh/pdf → acme/pdf", "old-gh/rev → acme/rev"], plan.Items.Select(i => $"{i.OldSlug} → {i.NewSlug}").ToArray());
+    }
+
+    [Fact] public void Conflict_with_an_existing_slug_of_the_same_type_blocks_apply()
+    {
+        var plan = P("acme", [(ArtifactType.Skill, "pdf")], (ArtifactType.Skill, "acme/pdf"));
+        Assert.False(plan.CanApply);
+        Assert.True(plan.Items[0].Conflict);
+    }
+
+    [Fact] public void Same_slug_of_another_type_is_not_a_conflict() =>
+        Assert.True(P("acme", [(ArtifactType.Skill, "pdf")], (ArtifactType.Agent, "acme/pdf")).CanApply);
+
+    [Theory]
+    [InlineData("Bad_NS")]
+    [InlineData("a")]
+    [InlineData("old-gh")]
+    public void Invalid_or_unchanged_namespace_is_refused(string ns) => Assert.False(P(ns, [(ArtifactType.Skill, "pdf")]).CanApply);
+}

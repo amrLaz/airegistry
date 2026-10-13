@@ -194,3 +194,12 @@ public class FeedSyncReport
     /// <summary>Messages (une ligne chacun) : erreurs et éléments ignorés.</summary>
     public string Messages { get; set; } = "";
 }
+
+/// <summary>Ancien slug conservé après un changement de namespace (docs/02 : namespace_aliases).</summary>
+public class NamespaceAlias
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string OldSlug { get; set; } = "";
+    public string NewSlug { get; set; } = "";
+    public DateTime ExpiresAt { get; set; }
+}

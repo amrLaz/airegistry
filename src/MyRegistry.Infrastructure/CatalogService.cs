@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Microsoft.EntityFrameworkCore;
+using MyRegistry.Application;
 using MyRegistry.Domain;
 
 namespace MyRegistry.Infrastructure;
@@ -51,8 +52,25 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace)
     public Task<ArtifactVersion?> GetByHashAsync(string hash, CancellationToken ct = default) =>
         db.Versions.Include(v => v.Artifact).Include(v => v.Files).FirstOrDefaultAsync(v => v.ContentHash == hash, ct);
 
+    /// <summary>Résout un ancien slug (changement de namespace) vers le slug actuel, tant que l'alias n'a pas expiré (547 jours). Une seule étape par appel, jusqu'à 3.</summary>
+    public async Task<(string Ns, string Name)> ResolveAliasAsync(string ns, string name, CancellationToken ct = default)
+    {
+        for (var hop = 0; hop < 3; hop++)
+        {
+            if (await db.Artifacts.AnyAsync(a => a.Namespace == ns && a.Name == name, ct)) break;
+            var slug = $"{ns}/{name}";
+            var now = DateTime.UtcNow;
+            var alias = (await db.Aliases.AsNoTracking().Where(a => a.OldSlug == slug).ToListAsync(ct)).Where(a => AliasRules.IsActive(a.ExpiresAt, now)).OrderByDescending(a => a.ExpiresAt).FirstOrDefault();
+            if (alias is null) break;
+            var parts = alias.NewSlug.Split('/');
+            (ns, name) = (parts[0], parts[1]);
+        }
+        return (ns, name);
+    }
+
     public async Task<ArtifactVersion?> GetByNameAsync(string ns, string name, string? version, CancellationToken ct = default)
     {
+        (ns, name) = await ResolveAliasAsync(ns, name, ct);
         var q = db.Versions.Include(v => v.Artifact).Include(v => v.Files)
             .Where(v => v.Artifact.Namespace == ns && v.Artifact.Name == name && v.Status == VersionStatus.Approved && !v.Quarantined);
         if (version is not null) q = q.Where(v => v.Version == version);

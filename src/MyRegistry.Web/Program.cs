@@ -40,6 +40,13 @@ builder.Services.AddSingleton<LocalGitProvider>();
 builder.Services.AddSingleton<IGitProvider>(sp => sp.GetRequiredService<LocalGitProvider>());
 builder.Services.AddSingleton<IGitProviderResolver, GitProviderResolver>();
 builder.Services.AddScoped<FeedService>();
+builder.Services.AddSingleton<IJobLock>(_ => string.IsNullOrWhiteSpace(connection) ? new InProcessLock() : new PostgresAdvisoryLock(connection));
+builder.Services.AddSingleton<IBackgroundJob, FeedSyncJob>();
+builder.Services.AddSingleton<IBackgroundJob, SnapshotJob>();
+builder.Services.AddSingleton<JobExecutor>();
+// Les jobs ne tournent pas en test ni si MYREGISTRY_JOBS=off (ex. un réplica dédié à l'interface).
+if (!builder.Environment.IsEnvironment("Testing") && !string.Equals(builder.Configuration["JOBS"], "off", StringComparison.OrdinalIgnoreCase))
+    builder.Services.AddHostedService<BackgroundJobRunner>();
 builder.Services.AddScoped<SnapshotService>();
 builder.Services.AddSingleton<SettingsCache>();
 builder.Services.AddScoped<Localizer>();

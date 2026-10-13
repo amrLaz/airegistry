@@ -18,6 +18,7 @@ public sealed class DbFixture : IAsyncLifetime
     private readonly string _dbName = "t_" + Guid.NewGuid().ToString("N")[..12];
 
     public WebApplicationFactory<Program> Factory { get; private set; } = null!;
+    public string ConnectionString { get; private set; } = "";
 
     public async Task InitializeAsync()
     {
@@ -37,6 +38,7 @@ public sealed class DbFixture : IAsyncLifetime
             await cmd.ExecuteNonQueryAsync();
         }
         var conn = new NpgsqlConnectionStringBuilder(_admin) { Database = _dbName }.ToString();
+        ConnectionString = conn;
 
         Factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
