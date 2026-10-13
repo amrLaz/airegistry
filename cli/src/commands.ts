@@ -5,6 +5,7 @@ import { configPath, resolveConfig, writeConfig, type Config } from './config.js
 import { applyPlan, detectAgent, planInstall, removeInstalled } from './install.js';
 import { readLock, writeLock, lockPath, type LockEntry } from './lock.js';
 import { checkName, parseSlug } from './names.js';
+import { applyEdits, planAddRegistry } from './registry.js';
 import { detectType, fromZip, isBinary, mainFileFor, readArtifact, toZip } from './pack.js';
 import { AGENTS, ARTIFACT_TYPES, CliError, type Agent, type ArtifactType } from './types.js';
 
@@ -254,6 +255,29 @@ export async function cmdPublish(ctx: Ctx, target: string | undefined, o: Opts):
   printIssues(ctx, 'AVERT.', result.warnings ?? []);
   ctx.out(`Publié ${ns}/${name}@${result.version} (Pending, grade ${result.grade}). En attente de modération.`);
   return 0;
+}
+
+export async function cmdAddRegistry(ctx: Ctx, o: Opts): Promise<number> {
+  const info = await ctx.api.registryInfo();
+  const url = str(o, 'marketplace') ?? info.marketplaceRepo ?? undefined;
+  if (!url) throw new CliError('Aucun dépôt de marketplace : le registre n\'en publie pas (Configuration > Dépôt du snapshot) ; précisez --marketplace URL.');
+  const plan = planAddRegistry({ url, title: info.title, global: !!o.g || !!o.global, cwd: ctx.cwd, home: ctx.home });
+
+  if (!o.apply) {
+    ctx.out(`Marketplace : ${url}`);
+    for (const e of plan.edits) ctx.out(`  • ${e.description} → ${e.file}`);
+    for (const c of plan.commands) ctx.out(`  • commande native : ${c}`);
+    for (const n of plan.notes) ctx.out(`  ! ${n}`);
+    ctx.out('Aucune modification (ajoutez --apply pour écrire les fichiers).');
+    return 0;
+  }
+  let skipped = 0;
+  for (const r of applyEdits(plan.edits)) {
+    if (r.status === 'skipped') { skipped++; ctx.err(`IGNORÉ ${r.file} : ${r.reason}`); }
+    else ctx.out(`${r.status === 'written' ? 'Écrit' : 'Déjà à jour'} : ${r.file}`);
+  }
+  for (const n of plan.notes) ctx.out(`! ${n}`);
+  return skipped > 0 ? 1 : 0;
 }
 
 export function buildCtx(base: { cwd: string; home: string; env?: NodeJS.ProcessEnv }, out: (s: string) => void, err: (s: string) => void, fetchImpl?: typeof fetch): Ctx {
