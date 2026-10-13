@@ -238,7 +238,7 @@ export async function cmdPublish(ctx: Ctx, target: string | undefined, o: Opts):
   };
 
   if (o['dry-run']) {
-    const r = await ctx.api.validate({ type, fileName: main, content: body.rawContent, additionalFiles: additional, binaryFiles: binary });
+    const r = await ctx.api.validate({ type, fileName: main, content: body.rawContent, additionalFiles: additional, binaryFiles: binary, namespace: ns, name });
     printIssues(ctx, 'ERREUR', r.errors);
     printIssues(ctx, 'AVERT.', r.warnings);
     ctx.out(`${r.isValid ? 'Validation OK' : 'Validation en échec'} (dry-run) : ${ns}/${name}@${version}, grade ${r.grade}. Rien n'a été publié.`);
