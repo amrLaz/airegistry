@@ -61,3 +61,13 @@
 - **`check`** : nommage vérifié en local (port TS de NameRules) ; secrets et validation par type via `POST /api/validate` (serveur = source de vérité, évite de dupliquer les détecteurs). Si le registre est injoignable : avertissement, seul le contrôle de nommage s'applique.
 - **Ajout API** : `GET /api/catalog/by-name/{ns}/{name}` (dernière version approuvée visible) pour résoudre un slug.
 - **Reste phase 2** : `login` (flux /cli/auth + token 1 min : l'API n'a pas encore d'auth par jeton), `edit`, `add-registry`, `completion`, surface npm `/skills/@scope/name`, hooks Claude globaux (fusion dans settings.json), assistant plugin.
+
+## 2026-10-13 — Phase 3, gouvernance (tranche 1 : utilisateurs, modération, audit)
+- **Rôles en base** : table `users` ; `HttpDevAuthProvider` lit le rôle en base. L'utilisateur dev par défaut (env) est créé avec le rôle de `MYREGISTRY_DEV_USER_ROLE` à sa première visite ; les autres sont créés `Reader`. Un Admin gère rôles et activation (`/admin/users`). Un utilisateur désactivé perd tous ses droits.
+- **Impersonation de test** : l'en-tête `X-Dev-User: email` simule un autre utilisateur, uniquement si `MYREGISTRY_AUTH_MODE` ≠ `oidc`. À retirer/ignorer en prod (désactivé automatiquement en mode oidc).
+- **Dernier administrateur** : impossible de le rétrograder ou le désactiver.
+- **Quarantaine** : désormais ≥ 5 signalements d'**utilisateurs distincts** en 1 h (corrige la limite notée à la tranche précédente).
+- **Rejet** : `POST /api/catalog/{id}/reject {reason}` (motif obligatoire) → `Deprecated`, motif dans l'historique de statut.
+- **Suppression de version** : la plus haute version SemVer (à défaut la plus récente) est protégée ; la seule version restante ne peut pas être supprimée (409). Modérateur+. `DeletionPolicy` testée unitairement.
+- **Pages** : `/admin` (KPI, répartition par statut et famille, activité récente), `/admin/moderation` (filtres Pending/Approved/Deprecated/ToReview/Quarantaine + recherche), `/admin/reports`, `/admin/users`, `/admin/audit`.
+- **Reste phase 3** : contrat de gouvernance (propriétaire, risque, classe de données, revue), page de configuration générale, Sanity Check/Réparer (dépend des feeds Git, phase 5), déquarantaine auto à revoir.

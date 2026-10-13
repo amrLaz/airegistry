@@ -1,0 +1,77 @@
+@page "/admin/users"
+@inject AdminService Admin
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["users"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["users"]</MudText>
+<AdminNav Current="/admin/users" />
+
+@if (_user.Role < Role.Admin)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-3 mb-3">
+        <MudStack Row Spacing="2" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center">
+            <MudTextField @bind-Value="_newEmail" Label="@L["email"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:260px" />
+            <MudSelect T="Role" @bind-Value="_newRole" Label="@L["role"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px">
+                @foreach (var r in Enum.GetValues<Role>()) { <MudSelectItem Value="r">@r</MudSelectItem> }
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddUser">@L["add_user"]</MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Class="pa-2">
+        @foreach (var u in _users)
+        {
+            var uu = u;
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="pa-2" Style="border-bottom:1px dashed rgba(128,128,128,.3)">
+                <div>
+                    <b>@uu.Email</b>
+                    <MudText Typo="Typo.caption">@L["last_login"] : @(uu.LastLogin?.ToString("yyyy-MM-dd HH:mm") ?? "—")</MudText>
+                </div>
+                <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                    <MudSelect T="Role" Value="uu.Role" ValueChanged="r => Change(uu, r, uu.Active)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:170px" aria-label="@L["role"]">
+                        @foreach (var r in Enum.GetValues<Role>()) { <MudSelectItem Value="r">@r</MudSelectItem> }
+                    </MudSelect>
+                    <MudSwitch T="bool" Value="uu.Active" ValueChanged="a => Change(uu, uu.Role, a)" Label="@L["active"]" Color="Color.Success" />
+                </MudStack>
+            </MudStack>
+        }
+    </MudPaper>
+}
+
+@code {
+    private IReadOnlyList<UserDto> _users = [];
+    private string _newEmail = "";
+    private Role _newRole = Role.Publisher;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Admin) _users = await Admin.UsersAsync();
+    }
+
+    private async Task Change(UserDto u, Role role, bool active)
+    {
+        var (_, error) = await Admin.UpsertUserAsync(u.Email, role, active, null, _user.Email);
+        if (error is not null) Snack.Add(error, Severity.Warning);
+        _users = await Admin.UsersAsync();
+    }
+
+    private async Task AddUser()
+    {
+        var (_, error) = await Admin.UpsertUserAsync(_newEmail, _newRole, true, null, _user.Email);
+        if (error is not null) Snack.Add(error, Severity.Warning); else _newEmail = "";
+        _users = await Admin.UsersAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

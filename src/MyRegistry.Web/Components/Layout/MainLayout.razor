@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject Localizer L
 @implements IDisposable
+@inject IAuthProvider Auth
 
 <MudThemeProvider @bind-IsDarkMode="_dark" Theme="_theme" />
 <MudPopoverProvider />
@@ -15,6 +16,10 @@
             </MudText>
         </MudLink>
         <MudSpacer />
+        @if (_user.Role >= Role.Moderator)
+        {
+            <MudButton Href="/admin" Color="Color.Inherit" Class="mr-1">@L["admin"]</MudButton>
+        }
         <MudButton Href="/my" Color="Color.Inherit" Class="mr-1">@L["my_pubs"]</MudButton>
         <MudButton Href="/publish" Variant="Variant.Filled" Style="background:#C6F24E;color:#10211C" Class="mr-2">@L["publish"]</MudButton>
         <MudButton Color="Color.Inherit" OnClick="L.Toggle" aria-label="@L["lang"]">@(L.Lang == "fr" ? "EN" : "FR")</MudButton>
@@ -38,6 +43,7 @@
     };
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
-    protected override void OnInitialized() => L.Changed += OnChanged;
+    private CurrentUser _user = default!;
+    protected override void OnInitialized() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; }
     public void Dispose() => L.Changed -= OnChanged;
 }

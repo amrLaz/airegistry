@@ -56,4 +56,13 @@ public class UiTests(DbFixture db)
         Assert.Contains("Commentaire visible", html);
         Assert.Contains("Signaler", html);
     }
+
+    [Theory]
+    [InlineData("/admin", "Tableau de bord")]
+    [InlineData("/admin/moderation", "Modération")]
+    [InlineData("/admin/reports", "Signalements")]
+    [InlineData("/admin/users", "dev@example.com")]
+    [InlineData("/admin/audit", "Journal d")]
+    public async Task Admin_pages_render_for_admin(string url, string expected) =>
+        Assert.Contains(expected, System.Net.WebUtility.HtmlDecode(await db.Factory.CreateClient().GetStringAsync(url)));
 }

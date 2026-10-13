@@ -1,0 +1,18 @@
+@inject Localizer L
+@inject IAuthProvider Auth
+
+<MudStack Row Spacing="1" Wrap="Wrap.Wrap" Class="mb-4">
+    <MudButton Href="/admin" Variant="@Style("/admin")" Size="Size.Small">@L["dashboard"]</MudButton>
+    <MudButton Href="/admin/moderation" Variant="@Style("/admin/moderation")" Size="Size.Small">@L["moderation"]</MudButton>
+    <MudButton Href="/admin/reports" Variant="@Style("/admin/reports")" Size="Size.Small">@L["reports"]</MudButton>
+    @if (Auth.GetCurrentUser().Role >= Role.Admin)
+    {
+        <MudButton Href="/admin/users" Variant="@Style("/admin/users")" Size="Size.Small">@L["users"]</MudButton>
+        <MudButton Href="/admin/audit" Variant="@Style("/admin/audit")" Size="Size.Small">@L["audit"]</MudButton>
+    }
+</MudStack>
+
+@code {
+    [Parameter] public string Current { get; set; } = "";
+    private Variant Style(string href) => href == Current ? Variant.Filled : Variant.Outlined;
+}

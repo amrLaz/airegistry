@@ -1,0 +1,47 @@
+@page "/admin/audit"
+@inject AdminService Admin
+@inject Localizer L
+@inject IAuthProvider Auth
+@implements IDisposable
+
+<PageTitle>@L["audit"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["audit"]</MudText>
+<AdminNav Current="/admin/audit" />
+
+@if (_user.Role < Role.Admin)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudTextField @bind-Value="_action" Immediate DebounceInterval="250" OnDebounceIntervalElapsed="Reload" Label="Action (ex. import, status, reject…)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:360px" Class="mb-3" />
+    <MudPaper Class="pa-2" Style="overflow-x:auto">
+        @foreach (var a in _page?.Items ?? [])
+        {
+            <div style="display:grid;grid-template-columns:140px 180px 140px 1fr;gap:12px;padding:6px 8px;border-bottom:1px dashed rgba(128,128,128,.3);font-size:13px;min-width:640px">
+                <span style="font-family:monospace">@a.At.ToString("MM-dd HH:mm:ss")</span>
+                <span>@a.UserId</span>
+                <b>@a.Action</b>
+                <span style="overflow-wrap:anywhere">@a.Entity @a.EntityId @a.Details</span>
+            </div>
+        }
+    </MudPaper>
+    <MudText Typo="Typo.caption" Class="mt-2">@(_page?.Total ?? 0)</MudText>
+}
+
+@code {
+    private PagedResult<AuditDto>? _page;
+    private string? _action;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Admin) await Reload();
+    }
+
+    private async Task Reload() => _page = await Admin.AuditAsync(string.IsNullOrWhiteSpace(_action) ? null : _action.Trim(), null, 1, 100);
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}
