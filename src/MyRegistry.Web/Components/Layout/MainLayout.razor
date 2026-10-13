@@ -31,8 +31,8 @@
     private bool _dark;
     private readonly MudTheme _theme = new()
     {
-        PaletteLight = new PaletteLight { Primary = "#10211C", Background = "#EEF1EC", Surface = "#FFFFFF", AppbarBackground = "#10211C" },
-        PaletteDark = new PaletteDark { Primary = "#C6F24E", Background = "#0A1612", Surface = "#10211C" },
+        PaletteLight = new PaletteLight { Primary = "#10211C", Secondary = "#4B6258", TextPrimary = "#10211C", TextSecondary = "#4B6258", PrimaryContrastText = "#FFFFFF", Background = "#EEF1EC", Surface = "#FFFFFF", AppbarBackground = "#10211C" },
+        PaletteDark = new PaletteDark { Primary = "#C6F24E", PrimaryContrastText = "#10211C", Secondary = "#8DA396", TextPrimary = "#E8EFE6", TextSecondary = "#A9BBAE", Info = "#7DD3FC", Background = "#0A1612", Surface = "#10211C" },
         LayoutProperties = new LayoutProperties { DefaultBorderRadius = "14px" },
     };
 
