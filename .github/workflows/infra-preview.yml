@@ -1,0 +1,32 @@
+# Sur chaque PR qui touche l'infra : montre ce qui changerait (what-if) avant la fusion.
+name: Infra preview
+on:
+  pull_request:
+    paths: ['infra/**', 'Dockerfile']
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  what-if:
+    runs-on: ubuntu-latest
+    # base main -> prod ; base develop (ou autre) -> dev
+    environment: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if
+        env:
+          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+          TARGET: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
+        run: |
+          az deployment group what-if \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --parameters "infra/params/${TARGET}.bicepparam" | tee what-if.txt
+          { echo '### What-if ('"$TARGET"')'; echo '```'; cat what-if.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

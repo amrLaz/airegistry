@@ -1,0 +1,36 @@
+# Promotion vers la prod = une PR vers main qui épingle le tag d'image dans infra/params/prod.bicepparam.
+name: Promote to prod
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'SHA complet du commit de develop (image déjà construite et déployée en dev)'
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Épingler le tag et ouvrir la PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.commit }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "SHA complet attendu"; exit 1; }
+          branch="chore/promote-${SHA:0:7}"
+          git config user.name "amr.lazraq"
+          git config user.email "lazraq.amr.94@gmail.com"
+          git checkout -b "$branch"
+          sed -i "s/^param imageTag = '.*'/param imageTag = '${SHA}'/" infra/params/prod.bicepparam
+          git commit -am "chore(deploy): promote ${SHA:0:7} to prod"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore(deploy): promote ${SHA:0:7} to prod" \
+            --body "Promotion de l'image \`${SHA}\` vers la prod. La fusion déclenche le déploiement (approbation de l'environnement prod requise). Auteur : amr.lazraq."

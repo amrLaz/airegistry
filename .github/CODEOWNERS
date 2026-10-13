@@ -1,0 +1,4 @@
+# Les changements d'infrastructure et de pipeline exigent une revue.
+/infra/            @amrLaz
+/.github/          @amrLaz
+/Dockerfile        @amrLaz
