@@ -19,7 +19,7 @@ public class CommunityService(AppDbContext db)
         db.Reports.Add(new Report { VersionId = versionId, UserId = userId, Reason = reason.ToString(), Details = details, At = now });
         await db.SaveChangesAsync(ct);
 
-        var times = await db.Reports.Where(r => r.VersionId == versionId).Select(r => r.At).ToListAsync(ct);
+        var times = (await db.Reports.Where(r => r.VersionId == versionId).Select(r => new { r.UserId, r.At }).ToListAsync(ct)).Select(r => (r.UserId, r.At)).ToList();
         if (!v.Quarantined && QuarantinePolicy.ShouldQuarantine(times, now))
         {
             v.Quarantined = true;

@@ -1,0 +1,54 @@
+@page "/admin/reports"
+@inject AdminService Admin
+@inject Localizer L
+@inject IAuthProvider Auth
+@implements IDisposable
+
+<PageTitle>@L["reports"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["reports"]</MudText>
+<AdminNav Current="/admin/reports" />
+
+@if (_user.Role < Role.Moderator)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-2">
+        @foreach (var r in _rows)
+        {
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="pa-2" Style="border-bottom:1px dashed rgba(128,128,128,.3)">
+                <div>
+                    <MudLink Href="@($"/artifact/{r.VersionId}")"><b>@r.Artifact</b> v@(r.Version)</MudLink>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">@r.Reason</MudChip>
+                    <MudText Typo="Typo.body2">@r.Details</MudText>
+                    <MudText Typo="Typo.caption">@r.UserId · @r.At.ToString("yyyy-MM-dd HH:mm") · @r.Status</MudText>
+                </div>
+                @if (r.Status == "Open")
+                {
+                    <MudStack Row Spacing="1">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" OnClick='() => Resolve(r.Id, "Resolved")'>@L["resolve"]</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick='() => Resolve(r.Id, "Dismissed")'>@L["dismiss"]</MudButton>
+                    </MudStack>
+                }
+            </MudStack>
+        }
+        @if (_rows.Count == 0) { <MudText Class="pa-3">—</MudText> }
+    </MudPaper>
+}
+
+@code {
+    private IReadOnlyList<ReportRow> _rows = [];
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Moderator) _rows = await Admin.ReportsAsync("Open");
+    }
+
+    private async Task Resolve(Guid id, string status) { await Admin.ResolveReportAsync(id, status, _user.Email); _rows = await Admin.ReportsAsync("Open"); }
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

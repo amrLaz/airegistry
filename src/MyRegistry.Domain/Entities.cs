@@ -100,3 +100,13 @@ public class AuditEntry
     public string EntityId { get; set; } = "";
     public string? Details { get; set; }
 }
+
+public class AppUser
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Email { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public Role Role { get; set; } = Role.Reader;
+    public bool Active { get; set; } = true;
+    public DateTime? LastLogin { get; set; }
+}

@@ -1,0 +1,14 @@
+<div style="margin:8px 0">
+    <div style="display:flex;justify-content:space-between;font-size:13px"><span>@Label</span><span style="font-family:monospace">@Value</span></div>
+    <div style="height:8px;background:rgba(128,128,128,.2);border-radius:99px;overflow:hidden">
+        <div style="@($"width:{Pct}%;height:100%;background:{Color}")"></div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int Value { get; set; }
+    [Parameter] public int Max { get; set; } = 1;
+    [Parameter] public string Color { get; set; } = "#10211C";
+    private int Pct => Max <= 0 ? 0 : Math.Clamp(Value * 100 / Max, Value > 0 ? 3 : 0, 100);
+}

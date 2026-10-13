@@ -1,0 +1,110 @@
+@page "/admin/moderation"
+@inject AdminService Admin
+@inject CatalogService Catalog
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["moderation"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["moderation"]</MudText>
+<AdminNav Current="/admin/moderation" />
+
+@if (_user.Role < Role.Moderator)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudStack Row Spacing="2" Wrap="Wrap.Wrap" Class="mb-3" AlignItems="AlignItems.Center">
+        <MudChip T="string" Variant="@(_status is null && _quarantined is null ? Variant.Filled : Variant.Outlined)" OnClick="() => Filter(null, null)">@L["all"]</MudChip>
+        <MudChip T="string" Variant="@(_status == VersionStatus.Pending ? Variant.Filled : Variant.Outlined)" OnClick="() => Filter(VersionStatus.Pending, null)">Pending</MudChip>
+        <MudChip T="string" Variant="@(_status == VersionStatus.Approved ? Variant.Filled : Variant.Outlined)" OnClick="() => Filter(VersionStatus.Approved, null)">Approved</MudChip>
+        <MudChip T="string" Variant="@(_status == VersionStatus.Deprecated ? Variant.Filled : Variant.Outlined)" OnClick="() => Filter(VersionStatus.Deprecated, null)">Deprecated</MudChip>
+        <MudChip T="string" Variant="@(_status == VersionStatus.ToReview ? Variant.Filled : Variant.Outlined)" OnClick="() => Filter(VersionStatus.ToReview, null)">ToReview</MudChip>
+        <MudChip T="string" Variant="@(_quarantined == true ? Variant.Filled : Variant.Outlined)" Color="Color.Error" OnClick="() => Filter(null, true)">@L["quarantined"]</MudChip>
+        <MudTextField @bind-Value="_q" Immediate DebounceInterval="250" OnDebounceIntervalElapsed="Reload" Placeholder="@L["search"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:300px" />
+    </MudStack>
+
+    <MudPaper Class="pa-2">
+        @foreach (var v in _rows)
+        {
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="pa-2" Style="border-bottom:1px dashed rgba(128,128,128,.3)">
+                <MudLink Href="@($"/artifact/{v.Id}")" Underline="Underline.None" Color="Color.Inherit">
+                    <b>@v.Namespace/@v.Name</b> <span style="font-family:monospace">v@(v.Version)</span>
+                    <MudChip T="string" Size="Size.Small" Style="@($"background:{TypeStyle.Color(v.Type)};color:#fff")">@TypeStyle.Label(v.Type, L.Lang == "fr")</MudChip>
+                    <MudText Typo="Typo.caption" Class="ml-2">@v.CreatedBy · @v.CreatedAt.ToString("yyyy-MM-dd")</MudText>
+                </MudLink>
+                <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
+                    @if (v.OpenReports > 0) { <MudChip T="string" Size="Size.Small" Color="Color.Warning">⚑ @v.OpenReports</MudChip> }
+                    @if (v.Quarantined) { <MudChip T="string" Size="Size.Small" Color="Color.Error">@L["quarantine"]</MudChip> }
+                    <MudChip T="string" Size="Size.Small" Color="@TypeStyle.StatusColor(v.Status)">@v.Status</MudChip>
+                    @if (v.Status != VersionStatus.Approved) { <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Filled" OnClick="() => Approve(v.Id)">@L["approve"]</MudButton> }
+                    @if (v.Status != VersionStatus.Deprecated) { <MudButton Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" OnClick="() => StartReject(v.Id)">@L["reject"]</MudButton> }
+                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text" OnClick="() => Delete(v.Id)">@L["delete"]</MudButton>
+                </MudStack>
+            </MudStack>
+            @if (_rejecting == v.Id)
+            {
+                <MudStack Row Spacing="2" Class="pa-2">
+                    <MudTextField @bind-Value="_reason" Label="@L["reject_reason"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="ConfirmReject">@L["reject"]</MudButton>
+                </MudStack>
+            }
+        }
+        @if (_rows.Count == 0) { <MudText Class="pa-3">—</MudText> }
+    </MudPaper>
+    <MudText Typo="Typo.caption" Class="mt-2">@_total</MudText>
+}
+
+@code {
+    private IReadOnlyList<VersionRow> _rows = [];
+    private int _total;
+    private VersionStatus? _status = VersionStatus.Pending;
+    private bool? _quarantined;
+    private string? _q;
+    private Guid? _rejecting;
+    private string _reason = "";
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Moderator) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        var p = await Admin.VersionsAsync(_status, _quarantined, _q, 1, 100);
+        _rows = p.Items; _total = p.Total;
+    }
+
+    private Task Filter(VersionStatus? s, bool? q) { _status = s; _quarantined = q; return Reload(); }
+    private async Task Approve(Guid id) { await Catalog.SetStatusAsync(id, VersionStatus.Approved, _user.Email, "moderation"); await Reload(); }
+    private void StartReject(Guid id) { _rejecting = id; _reason = ""; }
+
+    private async Task ConfirmReject()
+    {
+        if (string.IsNullOrWhiteSpace(_reason)) { Snack.Add(L["reject_reason"], Severity.Warning); return; }
+        await Admin.RejectAsync(_rejecting!.Value, _reason.Trim(), _user.Email);
+        _rejecting = null;
+        await Reload();
+    }
+
+    private async Task Delete(Guid id)
+    {
+        var verdict = await Admin.DeleteVersionAsync(id, _user.Email);
+        Snack.Add(verdict switch
+        {
+            DeletionVerdict.Allowed => "OK",
+            DeletionVerdict.OnlyVersion => "La seule version restante ne peut pas être supprimée.",
+            DeletionVerdict.LatestVersion => "La dernière version est protégée.",
+            _ => "Introuvable.",
+        }, verdict == DeletionVerdict.Allowed ? Severity.Success : Severity.Warning);
+        await Reload();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

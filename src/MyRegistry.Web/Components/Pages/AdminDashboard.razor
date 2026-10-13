@@ -1,0 +1,79 @@
+@page "/admin"
+@inject AdminService Admin
+@inject Localizer L
+@inject IAuthProvider Auth
+@implements IDisposable
+
+<PageTitle>@L["dashboard"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["admin"]</MudText>
+<AdminNav Current="/admin" />
+
+@if (_user.Role < Role.Moderator)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else if (_d is not null)
+{
+    <MudGrid Spacing="3" Class="mb-3">
+        @foreach (var (label, value, href) in Kpis())
+        {
+            <MudItem xs="6" md="3">
+                <MudLink Href="@href" Underline="Underline.None" Color="Color.Inherit">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">@label</MudText>
+                        <MudText Typo="Typo.h3" Style="font-weight:800">@value</MudText>
+                    </MudPaper>
+                </MudLink>
+            </MudItem>
+        }
+    </MudGrid>
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">@L["by_status"]</MudText>
+                @foreach (var kv in _d.ByStatus.OrderByDescending(k => k.Value)) { <Bar Label="@kv.Key" Value="kv.Value" Max="_d.Versions" Color="#10211C" /> }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">@L["by_type"]</MudText>
+                @foreach (var kv in _d.ByType.OrderByDescending(k => k.Value))
+                {
+                    <Bar Label="@kv.Key" Value="kv.Value" Max="_d.Versions" Color="@TypeStyle.Color(Enum.Parse<ArtifactType>(kv.Key))" />
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">@L["recent"]</MudText>
+                @foreach (var a in _d.Recent)
+                {
+                    <MudText Typo="Typo.body2" Style="border-top:1px dashed rgba(128,128,128,.3);padding:4px 0">
+                        <b>@a.Action</b> · @a.UserId <span style="opacity:.6">· @a.At.ToString("MM-dd HH:mm")</span>
+                    </MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private Dashboard? _d;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Moderator) _d = await Admin.DashboardAsync();
+    }
+
+    private IEnumerable<(string, int, string)> Kpis() =>
+    [
+        ("Artefacts", _d!.Artifacts, "/"), ("Versions", _d.Versions, "/admin/moderation"),
+        (L["quarantined"], _d.Quarantined, "/admin/moderation"), (L["open_reports"], _d.OpenReports, "/admin/reports"),
+    ];
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

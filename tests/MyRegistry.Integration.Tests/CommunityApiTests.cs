@@ -32,7 +32,9 @@ public class CommunityApiTests(DbFixture db)
         JsonElement last = default;
         for (var i = 0; i < 5; i++)
         {
-            var r = await c.PostAsJsonAsync($"/api/catalog/{id}/report", new { reason = "DataLeak", details = $"r{i}" });
+            var reporter = db.Factory.CreateClient();
+            reporter.DefaultRequestHeaders.Add("X-Dev-User", $"reporter{i}@example.com");
+            var r = await reporter.PostAsJsonAsync($"/api/catalog/{id}/report", new { reason = "DataLeak", details = $"r{i}" });
             Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
             last = await r.Content.ReadFromJsonAsync<JsonElement>();
         }
@@ -44,11 +46,25 @@ public class CommunityApiTests(DbFixture db)
     }
 
     [Fact]
+    public async Task One_user_reporting_five_times_does_not_quarantine()
+    {
+        var c = Client();
+        var id = await Publish(c, Unique("spam"));
+        for (var i = 0; i < 6; i++) await c.PostAsJsonAsync($"/api/catalog/{id}/report", new { reason = "BrokenArtifact" });
+        Assert.False((await c.GetFromJsonAsync<JsonElement>($"/api/catalog/{id}")).GetProperty("quarantined").GetBoolean());
+    }
+
+    [Fact]
     public async Task Fewer_than_five_reports_do_not_quarantine()
     {
         var c = Client();
         var id = await Publish(c, Unique("mildly"));
-        for (var i = 0; i < 4; i++) await c.PostAsJsonAsync($"/api/catalog/{id}/report", new { reason = "BrokenArtifact" });
+        for (var i = 0; i < 4; i++)
+        {
+            var reporter = db.Factory.CreateClient();
+            reporter.DefaultRequestHeaders.Add("X-Dev-User", $"mild{i}@example.com");
+            await reporter.PostAsJsonAsync($"/api/catalog/{id}/report", new { reason = "BrokenArtifact" });
+        }
         Assert.False((await c.GetFromJsonAsync<JsonElement>($"/api/catalog/{id}")).GetProperty("quarantined").GetBoolean());
     }
 

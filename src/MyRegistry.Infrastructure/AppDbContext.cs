@@ -15,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<StatusHistory> StatusHistory => Set<StatusHistory>();
     public DbSet<AuditEntry> Audit => Set<AuditEntry>();
+    public DbSet<AppUser> Users => Set<AppUser>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -74,6 +75,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.ToTable("status_history");
             e.Property(x => x.From).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.To).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<AppUser>(e =>
+        {
+            e.ToTable("users");
+            e.HasIndex(x => x.Email).IsUnique();
+            e.Property(x => x.Email).HasMaxLength(200);
+            e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
         });
         b.Entity<AuditEntry>(e => { e.ToTable("audit_log"); e.HasIndex(x => x.At); });
     }
