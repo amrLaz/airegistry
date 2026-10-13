@@ -17,6 +17,8 @@ public static class TypeStyle
         ArtifactType.Plugin => "Plugin", _ => "Hook",
     };
 
+    public static string Plural(ArtifactType t, bool fr) => t == ArtifactType.McpServer ? (fr ? "Serveurs MCP" : "MCP servers") : Label(t, fr) + "s";
+
     public static MudBlazor.Color StatusColor(VersionStatus s) => s switch
     {
         VersionStatus.Approved => MudBlazor.Color.Success, VersionStatus.Pending => MudBlazor.Color.Warning,
