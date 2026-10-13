@@ -31,6 +31,7 @@ builder.Services.AddScoped<IAuthProvider, DevAuthProvider>();
 builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<CommunityService>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 

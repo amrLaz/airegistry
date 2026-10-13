@@ -73,6 +73,65 @@ public static class Endpoints
             await svc.SetStatusAsync(id, body.Status, auth.GetCurrentUser().Email, body.Note) ? Results.NoContent() : Results.NotFound())
             .Require(Role.Moderator).WithName("SetStatus");
 
+        catalog.MapPost("/{id:guid}/report", async (Guid id, ReportRequest body, CommunityService svc, IAuthProvider auth) =>
+            await svc.ReportAsync(id, body.Reason, body.Details, auth.GetCurrentUser().Email) is { } r ? Results.Accepted(value: r) : Results.NotFound())
+            .Require(Role.Reader).WithName("Report");
+
+        catalog.MapPost("/{id:guid}/quarantine/release", async (Guid id, CommunityService svc, IAuthProvider auth) =>
+            await svc.ReleaseQuarantineAsync(id, auth.GetCurrentUser().Email) ? Results.NoContent() : Results.NotFound())
+            .Require(Role.Moderator).WithName("ReleaseQuarantine");
+
+        catalog.MapGet("/{id:guid}/comments", async (Guid id, CommunityService svc) =>
+            await svc.CommentsAsync(id) is { } l ? Results.Ok(l) : Results.NotFound()).WithName("Comments");
+
+        catalog.MapPost("/{id:guid}/comments", async (Guid id, CommentRequest body, CommunityService svc, IAuthProvider auth) =>
+            await svc.AddCommentAsync(id, auth.GetCurrentUser().Email, body.Body) is { } c ? Results.Created($"/api/catalog/{id}/comments", c)
+                : Results.Problem(statusCode: 400, title: "Commentaire vide ou artefact introuvable"))
+            .Require(Role.Reader).WithName("AddComment");
+
+        catalog.MapPost("/{id:guid}/unpublish", async (Guid id, CommunityService svc, IAuthProvider auth) =>
+        {
+            var u = auth.GetCurrentUser();
+            return await svc.UnpublishAsync(id, u.Email, Rank(u.Role) >= Rank(Role.Moderator)) switch
+            {
+                null => Results.NotFound(), false => Results.Problem(statusCode: 403, title: "Seul l'auteur ou un modérateur peut retirer cette version"),
+                _ => Results.NoContent(),
+            };
+        }).Require(Role.Publisher).WithName("Unpublish");
+
+        catalog.MapGet("/{id:guid}/export/cursorrules", async (Guid id, CatalogService svc) =>
+        {
+            var v = await svc.GetAsync(id);
+            if (v is null) return Results.NotFound();
+            return Results.Text(Exports.CursorRules(MainText(v)), "text/plain; charset=utf-8");
+        }).WithName("ExportCursorRules");
+
+        catalog.MapGet("/{id:guid}/export/claude-desktop", async (Guid id, CatalogService svc) =>
+        {
+            var v = await svc.GetAsync(id);
+            if (v is null) return Results.NotFound();
+            if (v.Artifact.Type != ArtifactType.McpServer) return Results.Problem(statusCode: 400, title: "Export réservé aux serveurs MCP");
+            var json = Exports.ClaudeDesktop(v.Artifact.Name, MainText(v));
+            return json is null ? Results.Problem(statusCode: 422, title: "Configuration MCP non convertible") : Results.Text(json, "application/json");
+        }).WithName("ExportClaudeDesktop");
+
+        catalog.MapGet("/{id:guid}/audit-prompt", async (Guid id, CatalogService svc) =>
+        {
+            var v = await svc.GetAsync(id);
+            if (v is null) return Results.NotFound();
+            var files = v.Files.Where(f => !f.IsBinary).OrderBy(f => f.Path, StringComparer.Ordinal)
+                .Select(f => new ExportFile(f.Path, Encoding.UTF8.GetString(f.Content)));
+            return Results.Text(Exports.AuditPrompt($"{v.Artifact.Namespace}/{v.Artifact.Name}", v.Artifact.Type, v.Version, files), "text/plain; charset=utf-8");
+        }).WithName("AuditPrompt");
+
+        var my = app.MapGroup("/api/my").WithTags("Mes publications");
+        my.MapGet("/publications", async (CommunityService svc, IAuthProvider auth) => await svc.MyPublicationsAsync(auth.GetCurrentUser().Email))
+            .Require(Role.Publisher).WithName("MyPublications");
+
+        app.MapGet("/api/cli/publish/suggested-version", async (string ns, string name, ArtifactType type, string? requestedVersion, CommunityService svc) =>
+            Results.Ok(new { version = await svc.SuggestVersionAsync(ns, name, type, requestedVersion) }))
+            .WithTags("Publication").Require(Role.Publisher).WithName("SuggestedVersion");
+
         var artifacts = app.MapGroup("/api/artifacts").WithTags("Artefacts");
         artifacts.MapGet("/by-name/{ns}/{name}/raw", async (string ns, string name, string? version, CatalogService svc) =>
         {
@@ -101,6 +160,12 @@ public static class Endpoints
         }).Require(Role.Publisher).WithName("Import");
     }
 
+    private static string MainText(ArtifactVersion v)
+    {
+        var main = v.Files.FirstOrDefault(f => f.Path == v.MainFile) ?? v.Files.First();
+        return Encoding.UTF8.GetString(main.Content);
+    }
+
     private static IResult Zip(ArtifactVersion v, HttpContext ctx)
     {
         ctx.Response.Headers["X-Artifact-Sha256"] = v.ContentHash;
@@ -110,3 +175,6 @@ public static class Endpoints
 }
 
 public sealed record StatusRequest(VersionStatus Status, string? Note);
+
+public sealed record ReportRequest(ReportReason Reason, string? Details);
+public sealed record CommentRequest(string Body);
