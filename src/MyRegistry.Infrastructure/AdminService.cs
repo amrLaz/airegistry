@@ -12,7 +12,7 @@ public sealed record ReportRow(Guid Id, Guid VersionId, string Artifact, string 
 public sealed record Dashboard(int Artifacts, int Versions, Dictionary<string, int> ByStatus, Dictionary<string, int> ByType,
     int Quarantined, int OpenReports, int Users, IReadOnlyList<AuditDto> Recent, int ReviewsDue);
 
-public class AdminService(AppDbContext db)
+public class AdminService(AppDbContext db, MarketplaceCache marketplace)
 {
     // ---- Utilisateurs ----
     public async Task<IReadOnlyList<UserDto>> UsersAsync(CancellationToken ct = default) =>
@@ -94,6 +94,7 @@ public class AdminService(AppDbContext db)
         if (v is null) return false;
         db.StatusHistory.Add(new StatusHistory { VersionId = id, From = v.Status, To = VersionStatus.Deprecated, UserId = actor, Note = "rejected: " + reason });
         v.Status = VersionStatus.Deprecated;
+        marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = actor, Action = "reject", Entity = "ArtifactVersion", EntityId = id.ToString(), Details = reason });
         await db.SaveChangesAsync(ct);
         return true;
@@ -108,6 +109,7 @@ public class AdminService(AppDbContext db)
         if (verdict != DeletionVerdict.Allowed) return verdict;
         db.Audit.Add(new AuditEntry { UserId = actor, Action = "delete-version", Entity = "ArtifactVersion", EntityId = id.ToString(), Details = $"{v.Artifact.Namespace}/{v.Artifact.Name}@{v.Version}" });
         db.Versions.Remove(v);
+        marketplace.Invalidate();
         await db.SaveChangesAsync(ct);
         return DeletionVerdict.Allowed;
     }

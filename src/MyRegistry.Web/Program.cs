@@ -34,6 +34,8 @@ builder.Services.AddScoped<IAuthProvider, HttpDevAuthProvider>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<GovernanceService>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddSingleton<MarketplaceCache>();
+builder.Services.AddScoped<PluginService>();
 builder.Services.AddSingleton<SettingsCache>();
 builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
@@ -81,6 +83,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
 
 app.MapApi();
 app.MapAdminApi();
+app.MapPluginApi();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

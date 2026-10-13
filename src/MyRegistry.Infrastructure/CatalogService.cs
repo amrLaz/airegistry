@@ -9,7 +9,7 @@ public sealed record CatalogItem(Guid Id, string Namespace, string Name, Artifac
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
-public class CatalogService(AppDbContext db)
+public class CatalogService(AppDbContext db, MarketplaceCache marketplace)
 {
     public async Task<PagedResult<CatalogItem>> ListAsync(ArtifactType? type, VersionStatus? status, string? tag, string? q, string? sort,
         bool includeNonPublic, int page, int pageSize, CancellationToken ct = default)
@@ -81,6 +81,7 @@ public class CatalogService(AppDbContext db)
         if (v is null) return false;
         db.StatusHistory.Add(new StatusHistory { VersionId = id, From = v.Status, To = to, UserId = userId, Note = note });
         v.Status = to;
+        marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = userId, Action = "status", Entity = "ArtifactVersion", EntityId = id.ToString(), Details = to.ToString() });
         await db.SaveChangesAsync(ct);
         return true;
