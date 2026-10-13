@@ -7,7 +7,7 @@ Prérequis : SDK .NET 10.
 ```bash
 dotnet run --project src/MyRegistry.Web
 ```
-Sans `MYREGISTRY_DB_CONNECTION`, l'application utilise un fichier SQLite jetable (`myregistry-local.db`, ignoré par git).
+Sans `MYREGISTRY_DB_CONNECTION`, l'application utilise un fichier SQLite jetable (`src/MyRegistry.Web/myregistry-local.db`, ignoré par git ; supprime-le pour repartir de zéro).
 
 | URL | Contenu |
 |---|---|

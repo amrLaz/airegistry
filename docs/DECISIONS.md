@@ -38,3 +38,11 @@
 - `MapStaticAssets()` à la place de `UseStaticFiles()`. En local, lancer avec le profil par défaut (`dotnet run`, environnement Development) pour que les assets MudBlazor soient servis.
 - Les tags sont désaccentués (`sécurité` → `securite`) par `NameRules.Canonicalize`.
 - Reste de la phase 1 : signalements/commentaires, export/audit-prompt, `suggested-version`, page Mes Publications.
+
+## 2026-10-13 — Phase 1, tranche 4 (communauté, exports, Mes Publications)
+- **Quarantaine auto** : ≥ 5 signalements dans la dernière heure sur une version (`QuarantinePolicy`). On compte les signalements, pas les utilisateurs distincts (l'auth dev n'a qu'un utilisateur) : à passer en « utilisateurs distincts » avec l'auth OIDC. Un nouveau scan ne lève pas la quarantaine ; seule la levée par un Moderator (`POST /quarantine/release`) le fait.
+- **Exports** : `.cursorrules` = fichier principal sans frontmatter ; `claude-desktop` = entrée `mcpServers` (command/args/env/url/transport) uniquement pour les serveurs MCP ; `audit-prompt` = méta-prompt FR avec les fichiers texte inclus.
+- **Unpublish** : passe la version en `Deprecated` ; autorisé à l'auteur ou à un Moderator+.
+- **Commentaires** : limités à 2000 caractères, rattachés à l'artefact (pas à la version) ; pas encore de modération des commentaires (champ `Hidden` prêt).
+- **Fichier SQLite local** : créé dans `src/MyRegistry.Web/` (dossier du projet), pas dans le dossier courant.
+- **Phase 1 : reste** : recherche globale (Ctrl+K), `archive` installable, fork, contenu brut sans HTML via `/api/artifacts/{id}/raw`.

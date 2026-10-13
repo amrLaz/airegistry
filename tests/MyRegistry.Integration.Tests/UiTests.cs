@@ -27,4 +27,33 @@ public class UiTests(DbFixture db)
     [Fact]
     public async Task Publish_page_renders() =>
         Assert.Contains("SKILL.md", await db.Factory.CreateClient().GetStringAsync("/publish"));
+
+    [Fact]
+    public async Task My_publications_page_lists_published_artifacts()
+    {
+        var c = db.Factory.CreateClient();
+        await c.PostAsJsonAsync("/api/import", new
+        {
+            type = "Skill", @namespace = "myregistry", name = "ui-mine", fileName = "SKILL.md",
+            rawContent = "---\nname: ui-mine\ndescription: d\n---\n# x",
+        });
+        Assert.Contains("ui-mine", await c.GetStringAsync("/my"));
+    }
+
+    [Fact]
+    public async Task Detail_page_shows_content_comments_and_report_sections()
+    {
+        var c = db.Factory.CreateClient();
+        var res = await c.PostAsJsonAsync("/api/import", new
+        {
+            type = "Skill", @namespace = "myregistry", name = "ui-detail", fileName = "SKILL.md",
+            rawContent = "---\nname: ui-detail\ndescription: d\n---\n# Corps visible",
+        });
+        var id = (await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("versionId").GetGuid();
+        await c.PostAsJsonAsync($"/api/catalog/{id}/comments", new { body = "Commentaire visible" });
+        var html = await c.GetStringAsync($"/artifact/{id}");
+        Assert.Contains("Corps visible", html);
+        Assert.Contains("Commentaire visible", html);
+        Assert.Contains("Signaler", html);
+    }
 }

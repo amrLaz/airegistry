@@ -1,0 +1,67 @@
+@page "/my"
+@inject CommunityService Community
+@inject Localizer L
+@inject IAuthProvider Auth
+@implements IDisposable
+
+<PageTitle>@L["my_pubs"] · MyRegistry</PageTitle>
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800">@L["my_pubs"]</MudText>
+
+    @if (_user.Role < Role.Publisher)
+    {
+        <MudAlert Severity="Severity.Warning">Rôle Publisher requis.</MudAlert>
+    }
+    else if (_items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">@L["no_pubs"]</MudAlert>
+    }
+    else
+    {
+        @foreach (var group in _items.GroupBy(i => i.Status).OrderBy(g => g.Key))
+        {
+            <MudText Typo="Typo.h6">@group.Key (@group.Count())</MudText>
+            <MudPaper Class="pa-2">
+                @foreach (var i in group)
+                {
+                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="pa-2" Style="border-bottom:1px dashed rgba(128,128,128,.3)">
+                        <MudLink Href="@($"/artifact/{i.Id}")" Underline="Underline.None" Color="Color.Inherit">
+                            <b>@i.Namespace/@i.Name</b> <span style="font-family:monospace">v@(i.Version)</span>
+                            <MudChip T="string" Size="Size.Small" Style="@($"background:{TypeStyle.Color(i.Type)};color:#fff")">@TypeStyle.Label(i.Type, L.Lang == "fr")</MudChip>
+                            @if (i.Quarantined) { <MudChip T="string" Size="Size.Small" Color="Color.Error">@L["quarantine"]</MudChip> }
+                        </MudLink>
+                        <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
+                            <MudChip T="string" Size="Size.Small" Color="@TypeStyle.StatusColor(i.Status)">@i.Status</MudChip>
+                            @if (i.Status != VersionStatus.Deprecated)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" OnClick="() => Unpublish(i.Id)">@L["unpublish"]</MudButton>
+                            }
+                        </MudStack>
+                    </MudStack>
+                }
+            </MudPaper>
+        }
+    }
+</MudStack>
+
+@code {
+    private IReadOnlyList<MyPublication> _items = [];
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Publisher) _items = await Community.MyPublicationsAsync(_user.Email);
+    }
+
+    private async Task Unpublish(Guid id)
+    {
+        await Community.UnpublishAsync(id, _user.Email, _user.Role >= Role.Moderator);
+        _items = await Community.MyPublicationsAsync(_user.Email);
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

@@ -22,6 +22,12 @@
             <MudSelectItem Value="@("recent")">@L["sort_recent"]</MudSelectItem>
             <MudSelectItem Value="@("popular")">@L["sort_popular"]</MudSelectItem>
         </MudSelect>
+        @if (_user.Role >= Role.Moderator)
+        {
+            <MudSelect T="VersionStatus?" Value="_status" ValueChanged="SetStatus" Variant="Variant.Outlined" Style="max-width:200px" Label="@L["status"]" Clearable>
+                @foreach (var st in Enum.GetValues<VersionStatus>()) { <MudSelectItem T="VersionStatus?" Value="st">@st</MudSelectItem> }
+            </MudSelect>
+        }
     </MudStack>
 
     <MudStack Row Wrap="Wrap.Wrap" Spacing="2">
@@ -35,6 +41,11 @@
             </MudChip>
         }
     </MudStack>
+
+    @if (_tag is not null)
+    {
+        <MudChip T="string" Color="Color.Primary" OnClose="() => SetTag(null)">@L["tag_filter"] : #@_tag</MudChip>
+    }
 
     @if (_items.Count == 0)
     {
@@ -56,7 +67,7 @@
                                 <MudText Typo="Typo.h5" Style="font-weight:800;letter-spacing:-0.02em;margin-top:-4px">@i.Name</MudText>
                                 <MudText Typo="Typo.body2" Class="my-2">@i.Description</MudText>
                                 <MudStack Row Wrap="Wrap.Wrap" Spacing="1" Class="mb-2">
-                                    @foreach (var tag in i.Tags) { <MudChip T="string" Size="Size.Small">#@tag</MudChip> }
+                                    @foreach (var tag in i.Tags) { <MudChip T="string" Size="Size.Small" OnClick="() => SetTag(tag)">#@tag</MudChip> }
                                 </MudStack>
                                 <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                                     <MudText Typo="Typo.body2">▲ @i.Votes</MudText>
@@ -77,6 +88,8 @@
     private string? _q;
     private string _sort = "recent";
     private ArtifactType? _type;
+    private string? _tag;
+    private VersionStatus? _status;
     private CurrentUser _user = default!;
 
     protected override async Task OnInitializedAsync()
@@ -88,11 +101,13 @@
 
     private async Task Reload()
     {
-        var page = await Svc.ListAsync(_type, null, null, _q, _sort, _user.Role >= Role.Moderator, 1, 60);
+        var page = await Svc.ListAsync(_type, _status, _tag, _q, _sort, _user.Role >= Role.Moderator, 1, 60);
         _items = page.Items.ToList();
         _total = page.Total;
     }
 
+    private Task SetTag(string? t) { _tag = t; return Reload(); }
+    private Task SetStatus(VersionStatus? st) { _status = st; return Reload(); }
     private Task SetType(ArtifactType? t) { _type = t; return Reload(); }
     private Task SortChanged(string s) { _sort = s; return Reload(); }
     private void OnChanged() => InvokeAsync(StateHasChanged);
