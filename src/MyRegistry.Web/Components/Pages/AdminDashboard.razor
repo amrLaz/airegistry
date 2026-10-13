@@ -17,7 +17,7 @@ else if (_d is not null)
     <MudGrid Spacing="3" Class="mb-3">
         @foreach (var (label, value, href) in Kpis())
         {
-            <MudItem xs="6" md="3">
+            <MudItem xs="6" md="2">
                 <MudLink Href="@href" Underline="Underline.None" Color="Color.Inherit">
                     <MudPaper Class="pa-4">
                         <MudText Typo="Typo.caption">@label</MudText>
@@ -71,7 +71,7 @@ else if (_d is not null)
     private IEnumerable<(string, int, string)> Kpis() =>
     [
         ("Artefacts", _d!.Artifacts, "/"), ("Versions", _d.Versions, "/admin/moderation"),
-        (L["quarantined"], _d.Quarantined, "/admin/moderation"), (L["open_reports"], _d.OpenReports, "/admin/reports"),
+        (L["quarantined"], _d.Quarantined, "/admin/moderation"), (L["open_reports"], _d.OpenReports, "/admin/reports"), (L["reviews_due"], _d.ReviewsDue, "/admin/moderation"),
     ];
 
     private void OnChanged() => InvokeAsync(StateHasChanged);

@@ -34,6 +34,7 @@ builder.Services.AddScoped<IAuthProvider, HttpDevAuthProvider>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<GovernanceService>();
 builder.Services.AddScoped<SettingsService>();
+builder.Services.AddSingleton<SettingsCache>();
 builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();

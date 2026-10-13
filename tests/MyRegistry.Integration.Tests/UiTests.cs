@@ -63,6 +63,22 @@ public class UiTests(DbFixture db)
     [InlineData("/admin/reports", "Signalements")]
     [InlineData("/admin/users", "dev@example.com")]
     [InlineData("/admin/audit", "Journal d")]
+    [InlineData("/admin/config", "Namespace par défaut")]
     public async Task Admin_pages_render_for_admin(string url, string expected) =>
         Assert.Contains(expected, System.Net.WebUtility.HtmlDecode(await db.Factory.CreateClient().GetStringAsync(url)));
+
+    [Fact]
+    public async Task Detail_page_shows_governance_contract_form_for_the_author()
+    {
+        var c = db.Factory.CreateClient();
+        var res = await c.PostAsJsonAsync("/api/import", new
+        {
+            type = "Skill", @namespace = "myregistry", name = "ui-gov", fileName = "SKILL.md",
+            rawContent = "---\nname: ui-gov\ndescription: d\n---\n# x",
+        });
+        var id = (await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("versionId").GetGuid();
+        var html = System.Net.WebUtility.HtmlDecode(await c.GetStringAsync($"/artifact/{id}"));
+        Assert.Contains("Contrat de gouvernance", html);
+        Assert.Contains("Niveau de risque", html);
+    }
 }

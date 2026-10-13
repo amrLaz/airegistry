@@ -2,6 +2,7 @@
 @inject Localizer L
 @implements IDisposable
 @inject IAuthProvider Auth
+@inject SettingsCache Settings
 
 <MudThemeProvider @bind-IsDarkMode="_dark" Theme="_theme" />
 <MudPopoverProvider />
@@ -12,7 +13,7 @@
     <MudAppBar Elevation="0" Color="Color.Transparent" Style="background:#10211C !important;color:#fff !important">
         <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit">
             <MudText Typo="Typo.h6" Style="font-weight:800;letter-spacing:-0.02em">
-                <span style="background:#C6F24E;color:#10211C;border-radius:8px;padding:2px 8px;margin-right:8px">M</span>MyRegistry
+                <span style="background:#C6F24E;color:#10211C;border-radius:8px;padding:2px 8px;margin-right:8px">@(_title.Length > 0 ? char.ToUpperInvariant(_title[0]) : 'M')</span>@_title
             </MudText>
         </MudLink>
         <MudSpacer />
@@ -44,6 +45,7 @@
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
     private CurrentUser _user = default!;
-    protected override void OnInitialized() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; }
+    private string _title = "MyRegistry";
+    protected override async Task OnInitializedAsync() { _user = Auth.GetCurrentUser(); L.Changed += OnChanged; _title = await Settings.TitleAsync(); }
     public void Dispose() => L.Changed -= OnChanged;
 }

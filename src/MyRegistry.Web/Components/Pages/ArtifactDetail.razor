@@ -1,6 +1,7 @@
 @page "/artifact/{Id:guid}"
 @inject CatalogService Svc
 @inject CommunityService Community
+@inject GovernanceService GovSvc
 @inject ISnackbar Snack
 @inject Localizer L
 @inject IAuthProvider Auth
@@ -112,6 +113,39 @@
                     </MudStack>
                 </MudPaper>
                             <MudPaper Class="pa-4 mt-3">
+                    <MudText Typo="Typo.h6">@L["governance"]</MudText>
+                    @if (_gov is not null)
+                    {
+                        @if (!_gov.Defined) { <MudText Typo="Typo.caption" Color="Color.Secondary">@L["gov_undefined"]</MudText> }
+                        @if (_gov.ReviewDue) { <MudChip T="string" Color="Color.Warning" Size="Size.Small">@L["gov_due"]</MudChip> }
+                        @if (_gov.CanEdit)
+                        {
+                            <MudTextField @bind-Value="_govOwner" Label="@L["gov_owner"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="my-2" />
+                            <MudSelect T="RiskLevel" @bind-Value="_govRisk" Label="@L["gov_risk"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="my-2">
+                                @foreach (var r in Enum.GetValues<RiskLevel>()) { <MudSelectItem Value="r">@r</MudSelectItem> }
+                            </MudSelect>
+                            <MudSelect T="DataClass" @bind-Value="_govData" Label="@L["gov_data"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="my-2">
+                                @foreach (var d in Enum.GetValues<DataClass>()) { <MudSelectItem Value="d">@d</MudSelectItem> }
+                            </MudSelect>
+                            <MudNumericField T="int?" @bind-Value="_govDays" Label="@L["gov_review"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="my-2" Min="1" Max="730" />
+                            <MudTextField @bind-Value="_govCaps" Label="@L["gov_caps"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="my-2" />
+                            @foreach (var e in _govErrors) { <MudAlert Severity="Severity.Error" Dense Class="my-1">@e.Message</MudAlert> }
+                            <MudStack Row Spacing="1" Class="mt-1">
+                                <MudButton OnClick="() => SaveGovernance(false)" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small">@L["save"]</MudButton>
+                                <MudButton OnClick="() => SaveGovernance(true)" Variant="Variant.Outlined" Size="Size.Small">@L["gov_mark"]</MudButton>
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-2">@L["gov_owner"] : <b>@_gov.Owner</b></MudText>
+                            <MudText Typo="Typo.body2">@L["gov_risk"] : <b>@_gov.Risk</b> · @L["gov_data"] : <b>@_gov.DataClass</b></MudText>
+                            <MudText Typo="Typo.body2">@L["gov_review"] : <b>@(_gov.ReviewEveryDays?.ToString() ?? "—")</b></MudText>
+                            <MudStack Row Wrap="Wrap.Wrap" Spacing="1" Class="mt-1">@foreach (var c in _gov.Capabilities) { <MudChip T="string" Size="Size.Small">@c</MudChip> }</MudStack>
+                        }
+                        <MudText Typo="Typo.caption" Class="mt-1">@L["gov_last_review"] : @(_gov.LastReviewed?.ToString("yyyy-MM-dd") ?? "—")</MudText>
+                    }
+                </MudPaper>
+                <MudPaper Class="pa-4 mt-3">
                     <MudText Typo="Typo.h6">@L["report"]</MudText>
                     <MudSelect T="ReportReason" @bind-Value="_reason" Label="@L["report_reason"]" Variant="Variant.Outlined" Dense Class="my-2">
                         @foreach (var r in Enum.GetValues<ReportReason>()) { <MudSelectItem Value="r">@r</MudSelectItem> }
@@ -130,6 +164,12 @@
     private int _votes;
     private CurrentUser _user = default!;
     private string? _selectedFile;
+    private GovernanceDto? _gov;
+    private string _govOwner = "", _govCaps = "";
+    private RiskLevel _govRisk;
+    private DataClass _govData;
+    private int? _govDays;
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _govErrors = [];
     private List<CommentDto> _comments = [];
     private string _newComment = "";
     private string _details = "";
@@ -145,7 +185,24 @@
             _votes = await Svc.VoteCountAsync(_v.ArtifactId);
             _selectedFile = (_v.Files.FirstOrDefault(f => f.Path == _v.MainFile) ?? _v.Files.FirstOrDefault(f => !f.IsBinary))?.Path;
             _comments = (await Community.CommentsAsync(Id))?.ToList() ?? [];
+            await LoadGovernance();
         }
+    }
+
+    private async Task LoadGovernance()
+    {
+        _gov = await GovSvc.GetAsync(Id, _user);
+        if (_gov is null) return;
+        _govOwner = _gov.Owner ?? ""; _govRisk = _gov.Risk; _govData = _gov.DataClass; _govDays = _gov.ReviewEveryDays;
+        _govCaps = string.Join(", ", _gov.Capabilities);
+    }
+
+    private async Task SaveGovernance(bool markReviewed)
+    {
+        var caps = _govCaps.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var r = await GovSvc.SaveAsync(Id, new GovernanceInput(_govOwner, _govRisk, _govData, _govDays, caps, markReviewed), _user);
+        _govErrors = r.Errors;
+        if (r.Contract is not null) { Snack.Add(L["saved"], Severity.Success); await LoadGovernance(); }
     }
 
     private string SelectedText() =>

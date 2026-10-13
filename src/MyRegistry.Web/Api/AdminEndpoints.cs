@@ -33,9 +33,10 @@ public static class AdminEndpoints
             await svc.AuditAsync(action, user, page ?? 1, pageSize ?? 50)).Require(Role.Admin).WithTags("Administration").WithName("Audit");
 
         admin.MapGet("/settings", async (SettingsService svc) => await svc.GetAllAsync()).Require(Role.Admin).WithName("Settings");
-        admin.MapPut("/settings", async (Dictionary<string, string> body, SettingsService svc, IAuthProvider auth) =>
+        admin.MapPut("/settings", async (Dictionary<string, string> body, SettingsService svc, IAuthProvider auth, MyRegistry.Web.Services.SettingsCache cache) =>
         {
             var errors = await svc.UpdateAsync(body, auth.GetCurrentUser().Email);
+            cache.Invalidate();
             return errors.Count == 0 ? Results.NoContent() : Results.Problem(statusCode: 422, title: "Configuration invalide", extensions: new Dictionary<string, object?> { ["errors"] = errors });
         }).Require(Role.Admin).WithName("UpdateSettings");
 

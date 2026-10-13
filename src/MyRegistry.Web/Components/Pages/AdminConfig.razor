@@ -1,0 +1,54 @@
+@page "/admin/config"
+@inject SettingsService Settings
+@inject SettingsCache Cache
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["config"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["config"]</MudText>
+<AdminNav Current="/admin/config" />
+
+@if (_user.Role < Role.Admin)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudPaper Class="pa-4" Style="max-width:640px">
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_title" Label="@L["config_title"]" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_ns" Label="@L["config_ns"]" Variant="Variant.Outlined" HelperText="2–32, a-z 0-9 -" />
+            <MudTextField @bind-Value="_url" Label="@L["config_url"]" Variant="Variant.Outlined" Placeholder="https://registry.example.com" />
+            @foreach (var e in _errors) { <MudAlert Severity="Severity.Error" Dense><code>@e.Code</code> @e.Message</MudAlert> }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">@L["save"]</MudButton>
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    private string _title = "", _ns = "", _url = "";
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _errors = [];
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role < Role.Admin) return;
+        var s = await Settings.GetAllAsync();
+        _title = s.GetValueOrDefault(SettingKeys.Title, ""); _ns = s.GetValueOrDefault(SettingKeys.DefaultNamespace, ""); _url = s.GetValueOrDefault(SettingKeys.PublicUrl, "");
+    }
+
+    private async Task Save()
+    {
+        _errors = await Settings.UpdateAsync(new Dictionary<string, string>
+        { [SettingKeys.Title] = _title, [SettingKeys.DefaultNamespace] = _ns, [SettingKeys.PublicUrl] = _url }, _user.Email);
+        Cache.Invalidate();
+        if (_errors.Count == 0) Snack.Add(L["saved"], Severity.Success);
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}
