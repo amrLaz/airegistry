@@ -22,6 +22,13 @@ git config user.name "amr.lazraq"
 Exemples : `feat/catalogue-recherche`, `fix/sha256-download`.
 Le caractère `:` est interdit par Git dans un nom de branche : on utilise `/`.
 
+## Flux de branches
+- `develop` : branche d'intégration. Tout le travail y est fusionné.
+- Chaque tranche : `git checkout develop && git pull`, puis `git checkout -b feat/<sujet>`.
+- Une fois les tests verts : fusion dans `develop` (PR ou `git merge --no-ff`), puis suppression de la branche de tranche.
+- Jamais de branche créée à partir d'une autre branche `feat/`.
+- `main` ne reçoit que des fusions de `develop` (versions stables).
+
 ## Commits
 Format conventionnel : `type(scope): résumé à l'impératif`, ex. `feat(api): ajouter POST /api/validate`.
 Une tranche verticale (API + UI + tests + doc) = un commit.

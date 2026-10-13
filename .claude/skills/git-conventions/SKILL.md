@@ -18,6 +18,9 @@ Exemples : `feat/catalogue-recherche`, `fix/sha256-download`, `docs/api-contract
 Les `:` sont interdits dans un nom de branche Git : le séparateur est `/`.
 Si une branche imposée par l'outil ne respecte pas le format, signale-le avant de pousser.
 
+## Flux
+Toujours partir de `develop` à jour pour créer une branche de tranche, fusionner dans `develop` quand les tests sont verts, puis supprimer la branche. Ne jamais empiler une branche `feat/` sur une autre.
+
 ## Commits
 - Message conventionnel : `type(scope): résumé impératif` (≤ 72 car.), ex. `feat(api): ajouter POST /api/validate`.
 - Une tranche verticale = un commit.
