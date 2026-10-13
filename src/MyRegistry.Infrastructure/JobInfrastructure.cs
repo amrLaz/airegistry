@@ -149,3 +149,17 @@ public sealed class SnapshotJob : IBackgroundJob
         await svc.PublishAsync("system", ct);
     }
 }
+
+/// <summary>Réanalyse quotidiennement la dernière version de chaque artefact : un constat tardif (nouvelles règles) repasse une version approuvée en ToReview.</summary>
+public sealed class SecurityRescanJob : IBackgroundJob
+{
+    public string Name => "security-rescan";
+    public TimeSpan Interval => TimeSpan.FromHours(24);
+
+    public async Task RunAsync(IServiceProvider sp, CancellationToken ct)
+    {
+        var svc = sp.GetRequiredService<SecurityService>();
+        if (!await svc.IsEnabledAsync(ct)) return;
+        await svc.BackfillAsync("system", ct);
+    }
+}

@@ -4,6 +4,7 @@
 <MudStack Row Spacing="1" Wrap="Wrap.Wrap" Class="mb-4">
     <MudButton Href="/admin" Variant="@Style("/admin")" Size="Size.Small">@L["dashboard"]</MudButton>
     <MudButton Href="/admin/moderation" Variant="@Style("/admin/moderation")" Size="Size.Small">@L["moderation"]</MudButton>
+    <MudButton Href="/admin/security" Variant="@Style("/admin/security")" Size="Size.Small">@L["security"]</MudButton>
     <MudButton Href="/admin/reports" Variant="@Style("/admin/reports")" Size="Size.Small">@L["reports"]</MudButton>
     @if (Auth.GetCurrentUser().Role >= Role.Admin)
     {

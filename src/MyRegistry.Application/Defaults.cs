@@ -7,6 +7,8 @@ public static class SettingKeys
     public const string PublicUrl = "public_url";
     /// <summary>Dépôt Git recevant le snapshot de la marketplace (file:///chemin pour l'instant).</summary>
     public const string MarketplaceRepo = "marketplace_repo";
+    /// <summary>Analyse de sécurité directe à la publication (« true » par défaut).</summary>
+    public const string SecurityScanEnabled = "security_scan_enabled";
     public const string SnapshotDigest = "marketplace_snapshot_digest";
     public const string SnapshotAt = "marketplace_snapshot_at";
     public const string SnapshotCommit = "marketplace_snapshot_commit";
@@ -19,5 +21,6 @@ public static class SettingDefaults
     {
         [SettingKeys.Title] = "MyRegistry",
         [SettingKeys.DefaultNamespace] = "myregistry",
+        [SettingKeys.SecurityScanEnabled] = "true",
     };
 }

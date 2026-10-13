@@ -3,6 +3,7 @@
 @inject CommunityService Community
 @inject GovernanceService GovSvc
 @inject PluginService PluginSvc
+@inject SecurityService SecSvc
 @inject ISnackbar Snack
 @inject Localizer L
 @inject IAuthProvider Auth
@@ -130,6 +131,52 @@
                     </MudStack>
                 </MudPaper>
                             <MudPaper Class="pa-4 mt-3">
+                    <MudText Typo="Typo.h6">@L["security"]</MudText>
+                    @if (_sec is not null)
+                    {
+                        <MudStack Row Spacing="1" Wrap="Wrap.Wrap" Class="my-1">
+                            <MudChip T="string" Size="Size.Small" Color="@VerdictColor(_sec.Verdict)">@(_sec.Verdict == "Blocked" ? L["sec_blocked"] : _sec.Verdict == "Clean" ? L["sec_clean"] : _sec.Verdict)</MudChip>
+                            @if (_sec.Scan is not null) { <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@_sec.Scan.ToolVersion · @_sec.Scan.Mode</MudChip> }
+                        </MudStack>
+                        @if (_sec.Scan is null || _sec.ScanStale) { <MudText Typo="Typo.caption" Color="Color.Secondary">@L["sec_none"]</MudText> }
+                        @if (_sec.Scan is { Incomplete: true }) { <MudAlert Severity="Severity.Warning" Dense Class="my-1">@L["sec_incomplete"] (@_sec.Scan.FilesScanned/@_sec.Scan.FilesTotal)</MudAlert> }
+                        @foreach (var f in _sec.Findings)
+                        {
+                            <div style="border-top:1px dashed rgba(128,128,128,.3);padding:6px 0;font-size:13px">
+                                <MudChip T="string" Size="Size.Small" Color="@SevColor(f.Severity)">@f.Severity</MudChip>
+                                <b>@f.RuleId</b>
+                                @if (f.ExcludedByBaseline) { <span style="opacity:.7">· @L["sec_excluded"]</span> }
+                                @if (f.Waived) { <span style="opacity:.7">· @L["sec_waived"]</span> }
+                                <div style="font-family:monospace;overflow-wrap:anywhere">@f.File:@f.Line</div>
+                                <div style="opacity:.8">@f.Message</div>
+                            </div>
+                        }
+                        @foreach (var w in _sec.Waivers)
+                        {
+                            <MudText Typo="Typo.caption" Style="display:block;margin-top:6px">
+                                @L["sec_waiver"] <b>@w.AcceptedSeverity</b> · @w.By · @w.At.ToString("yyyy-MM-dd") @(w.ExpiresAt is { } ex ? $"→ {ex:yyyy-MM-dd}" : "") @(w.RevokedAt is not null ? "· ✕" : "")
+                                <br />« @w.Reason »
+                                @if (w.RevokedAt is null && _sec.CanWaive) { <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => RevokeWaiver(w.Id)">@L["sec_waiver_revoke"]</MudButton> }
+                            </MudText>
+                        }
+                        <MudStack Row Spacing="1" Wrap="Wrap.Wrap" Class="mt-2">
+                            @if (_user.Role >= Role.Moderator) { <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="Rescan">@L["sec_scan"]</MudButton> }
+                            @if (_sec.Findings.Count > 0) { <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/api/catalog/{Id}/security/fix-prompt")" Target="_blank">@L["sec_fix"]</MudButton> }
+                        </MudStack>
+                        @if (_sec.CanWaive && _sec.BlockingCount > 0)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mt-3">@L["sec_waiver_new"]</MudText>
+                            <MudSelect T="FindingSeverity" @bind-Value="_waiverSeverity" Variant="Variant.Outlined" Margin="Margin.Dense" Class="my-1">
+                                <MudSelectItem Value="FindingSeverity.High">High</MudSelectItem>
+                                @if (_user.Role >= Role.SecurityValidator) { <MudSelectItem Value="FindingSeverity.Critical">Critical</MudSelectItem> }
+                            </MudSelect>
+                            <MudTextField @bind-Value="_waiverReason" Label="@L["sec_waiver_reason"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+                            @foreach (var e in _waiverErrors) { <MudAlert Severity="Severity.Error" Dense Class="mt-1">@e.Message</MudAlert> }
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning" Class="mt-1" OnClick="AddWaiver">@L["sec_waiver"]</MudButton>
+                        }
+                    }
+                </MudPaper>
+                <MudPaper Class="pa-4 mt-3">
                     <MudText Typo="Typo.h6">@L["governance"]</MudText>
                     @if (_gov is not null)
                     {
@@ -181,6 +228,10 @@
     private int _votes;
     private CurrentUser _user = default!;
     private string? _selectedFile;
+    private SecuritySummary? _sec;
+    private FindingSeverity _waiverSeverity = FindingSeverity.High;
+    private string _waiverReason = "";
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _waiverErrors = [];
     private IReadOnlyList<ComponentRef> _pluginComponents = [];
     private IReadOnlyList<ComponentUpdate> _pluginUpdates = [];
     private GovernanceDto? _gov;
@@ -205,6 +256,7 @@
             _selectedFile = (_v.Files.FirstOrDefault(f => f.Path == _v.MainFile) ?? _v.Files.FirstOrDefault(f => !f.IsBinary))?.Path;
             _comments = (await Community.CommentsAsync(Id))?.ToList() ?? [];
             await LoadGovernance();
+            _sec = await SecSvc.SummaryAsync(Id, _user);
             if (_v.Artifact.Type == ArtifactType.Plugin)
             {
                 var manifest = _v.Files.FirstOrDefault(f => PluginRules.ManifestPaths.Contains(f.Path));
@@ -212,6 +264,25 @@
                 _pluginUpdates = await PluginSvc.UpdatesForVersionAsync(Id);
             }
         }
+    }
+
+    private static Color VerdictColor(string v) => v switch { "Blocked" => Color.Error, "Findings" => Color.Warning, "Clean" => Color.Success, _ => Color.Default };
+    private static Color SevColor(string s) => s switch { "Critical" => Color.Error, "High" => Color.Warning, "Medium" => Color.Info, _ => Color.Default };
+
+    private async Task Rescan() { _sec = await SecSvc.ScanVersionAsync(Id, "manual", _user.Email, _user); _v = await Svc.GetAsync(Id); }
+
+    private async Task AddWaiver()
+    {
+        var r = await SecSvc.AddWaiverAsync(Id, _waiverSeverity, _waiverReason, null, _user);
+        _waiverErrors = r.Errors;
+        if (r.Waiver is not null) { _waiverReason = ""; _sec = await SecSvc.SummaryAsync(Id, _user); }
+    }
+
+    private async Task RevokeWaiver(Guid waiverId)
+    {
+        await SecSvc.RevokeWaiverAsync(waiverId, _user);
+        _v = await Svc.GetAsync(Id);
+        _sec = await SecSvc.SummaryAsync(Id, _user);
     }
 
     private async Task LoadGovernance()
@@ -260,8 +331,10 @@
 
     private async Task SetStatus(VersionStatus s)
     {
-        await Svc.SetStatusAsync(Id, s, _user.Email, null);
+        var r = await Svc.TransitionAsync(Id, s, _user.Email, null);
+        if (r.Error is not null) Snack.Add(r.Error, Severity.Error, o => o.RequireInteraction = true);
         _v = await Svc.GetAsync(Id);
+        _sec = await SecSvc.SummaryAsync(Id, _user);
     }
 
     private static string FormatSize(int b) => b < 1024 ? $"{b} o" : $"{b / 1024.0:0.0} Ko";

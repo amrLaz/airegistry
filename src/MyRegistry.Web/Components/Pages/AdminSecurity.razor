@@ -1,0 +1,103 @@
+@page "/admin/security"
+@inject SecurityService Sec
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["security"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["security"]</MudText>
+<AdminNav Current="/admin/security" />
+
+@if (_user.Role < Role.Moderator)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">@L["sec_blocked_list"] (@_blocked.Count)</MudText>
+                @foreach (var b in _blocked)
+                {
+                    <div style="border-top:1px dashed rgba(128,128,128,.3);padding:6px 0">
+                        <MudLink Href="@($"/artifact/{b.VersionId}")"><b>@b.Artifact</b> v@(b.Version)</MudLink>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">@b.Verdict</MudChip>
+                    </div>
+                }
+                @if (_user.Role >= Role.Admin)
+                {
+                    <MudStack Row Spacing="2" Class="mt-3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                        <MudButton Variant="Variant.Outlined" OnClick="Backfill" Disabled="_busy">@L["sec_backfill"]</MudButton>
+                        @if (_run is not null)
+                        {
+                            <MudText Typo="Typo.caption">@_run.Scanned · ⛔ @_run.Blocked · ✕ @_run.Failed · ↩ @_run.MovedToReview</MudText>
+                            <MudButton Variant="Variant.Text" Href="@($"/api/admin/security-scans/backfill/{_run.RunId}/report.csv")">@L["sec_csv"]</MudButton>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+            <MudPaper Class="pa-4 mt-3">
+                <MudText Typo="Typo.h6">@L["sec_rules"]</MudText>
+                @foreach (var r in StaticScanner.Catalog.OrderByDescending(r => r.Severity))
+                {
+                    <div style="border-top:1px dashed rgba(128,128,128,.3);padding:4px 0;font-size:13px">
+                        <MudChip T="string" Size="Size.Small" Color="@(r.Severity >= FindingSeverity.High ? Color.Error : Color.Default)">@r.Severity</MudChip>
+                        <code>@r.Id</code> — @r.Description
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            @if (_user.Role >= Role.SecurityValidator)
+            {
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6">@L["sec_baseline"]</MudText>
+                    <MudTextField @bind-Value="_yaml" Lines="12" Variant="Variant.Outlined" Style="font-family:monospace" Class="my-2" />
+                    <MudCheckBox T="bool" @bind-Value="_confirm" Label="@L["sec_baseline_confirm"]" />
+                    @foreach (var e in _errors) { <MudAlert Severity="Severity.Error" Dense Class="mb-1"><code>@e.Code</code> @e.Message</MudAlert> }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveBaseline">@L["save"]</MudButton>
+                    @if (_baseline?.At is { } at) { <MudText Typo="Typo.caption" Class="ml-2">@_baseline.UpdatedBy · @at.ToString("yyyy-MM-dd HH:mm") · @_baseline.Sha256[..Math.Min(8, _baseline.Sha256.Length)]</MudText> }
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private IReadOnlyList<(Guid VersionId, string Artifact, string Version, string Verdict)> _blocked = [];
+    private BaselineDto? _baseline;
+    private string _yaml = "";
+    private bool _confirm, _busy;
+    private BackfillResult? _run;
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _errors = [];
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role < Role.Moderator) return;
+        _blocked = await Sec.BlockedAsync();
+        if (_user.Role >= Role.SecurityValidator) { _baseline = await Sec.GetBaselineAsync(); _yaml = _baseline.Yaml; }
+    }
+
+    private async Task SaveBaseline()
+    {
+        var r = await Sec.SaveBaselineAsync(_yaml, _confirm, _user.Email);
+        _errors = r.Errors;
+        if (r.Baseline is not null) { _baseline = r.Baseline; _confirm = false; Snack.Add(L["saved"], Severity.Success); _blocked = await Sec.BlockedAsync(); }
+    }
+
+    private async Task Backfill()
+    {
+        _busy = true;
+        _run = await Sec.BackfillAsync(_user.Email);
+        _blocked = await Sec.BlockedAsync();
+        _busy = false;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

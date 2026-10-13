@@ -81,7 +81,12 @@ else
     }
 
     private Task Filter(VersionStatus? s, bool? q) { _status = s; _quarantined = q; return Reload(); }
-    private async Task Approve(Guid id) { await Catalog.SetStatusAsync(id, VersionStatus.Approved, _user.Email, "moderation"); await Reload(); }
+    private async Task Approve(Guid id)
+    {
+        var r = await Catalog.TransitionAsync(id, VersionStatus.Approved, _user.Email, "moderation");
+        if (r.Error is not null) Snack.Add(r.Error, Severity.Error, o => o.RequireInteraction = true);
+        await Reload();
+    }
     private void StartReject(Guid id) { _rejecting = id; _reason = ""; }
 
     private async Task ConfirmReject()

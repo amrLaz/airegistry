@@ -207,3 +207,60 @@ public class NamespaceAlias
     public string NewSlug { get; set; } = "";
     public DateTime ExpiresAt { get; set; }
 }
+
+public class SecurityScan
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid VersionId { get; set; }
+    public string ContentHash { get; set; } = "";
+    /// <summary>direct (publication) | manual (relance) | backfill | feed | rescan.</summary>
+    public string Mode { get; set; } = "direct";
+    public string ToolVersion { get; set; } = "";
+    public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? EndedAt { get; set; }
+    public string Status { get; set; } = "Succeeded";
+    public int? MaxSeverity { get; set; }
+    public int FilesScanned { get; set; }
+    public int FilesTotal { get; set; }
+    public bool Incomplete { get; set; }
+    public string Verdict { get; set; } = "Clean";
+    public Guid? RunId { get; set; }
+    public List<SecurityFinding> Findings { get; set; } = [];
+}
+
+public class SecurityFinding
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ScanId { get; set; }
+    public string RuleId { get; set; } = "";
+    public int Severity { get; set; }
+    public string File { get; set; } = "";
+    public int Line { get; set; }
+    public string Message { get; set; } = "";
+    public bool BlocksPublish { get; set; }
+}
+
+public class SecurityWaiver
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid VersionId { get; set; }
+    public string ContentHash { get; set; } = "";
+    public int AcceptedSeverity { get; set; }
+    public string By { get; set; } = "";
+    public DateTime At { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }
+    public string Reason { get; set; } = "";
+    public DateTime? RevokedAt { get; set; }
+    public string? RevokedBy { get; set; }
+}
+
+public class ScanBaseline
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Yaml { get; set; } = "";
+    public string Sha256 { get; set; } = "";
+    public string ExcludedRules { get; set; } = "";
+    public string UpdatedBy { get; set; } = "";
+    public DateTime At { get; set; } = DateTime.UtcNow;
+    public bool Active { get; set; }
+}
