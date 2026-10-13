@@ -9,7 +9,8 @@ public sealed record FilePayload(string Path, byte[] Content, bool IsBinary);
 
 public sealed record ValidateRequest(
     ArtifactType? Type, string FileName, string Content,
-    Dictionary<string, string>? AdditionalFiles = null, Dictionary<string, string>? BinaryFiles = null);
+    Dictionary<string, string>? AdditionalFiles = null, Dictionary<string, string>? BinaryFiles = null,
+    string? Namespace = null, string? Name = null);
 
 public sealed record ImportRequest(
     ArtifactType Type, string Namespace, string Name, string? Version, string? Description,

@@ -132,6 +132,17 @@ public class CatalogApiTests(DbFixture db)
     }
 
     [Fact]
+    public async Task Validate_checks_name_when_provided()
+    {
+        var content = "---\nname: mon-skill\ndescription: Un skill de test\n---\n# Mon skill\n";
+        var res = await Client().PostAsJsonAsync("/api/validate", new { fileName = "SKILL.md", content, @namespace = "myregistry", name = "mon-skill" });
+        res.EnsureSuccessStatusCode();
+        var body = await Json(res);
+        Assert.False(body.GetProperty("isValid").GetBoolean());
+        Assert.Contains("name-contains-type", body.GetProperty("errors").EnumerateArray().Select(e => e.GetProperty("code").GetString()));
+    }
+
+    [Fact]
     public async Task Upvote_is_idempotent_and_removable()
     {
         var c = Client();

@@ -1,5 +1,6 @@
 using System.Text;
 using MyRegistry.Application;
+using MyRegistry.Application.Rules;
 using MyRegistry.Domain;
 using MyRegistry.Infrastructure;
 
@@ -163,7 +164,14 @@ public static class Endpoints
             try
             {
                 var files = PayloadBuilder.Build(req.FileName, req.Content, req.AdditionalFiles, req.BinaryFiles);
-                return Results.Ok(Validation.Run(req.Type, files));
+                var report = Validation.Run(req.Type, files);
+                if (req.Namespace is not null && req.Name is not null && report.DetectedType is { } t)
+                {
+                    var nameErrors = NameRules.Check(req.Namespace, req.Name, t, creation: true).Errors;
+                    if (nameErrors.Count > 0)
+                        report = report with { IsValid = false, Errors = nameErrors.Concat(report.Errors).ToList() };
+                }
+                return Results.Ok(report);
             }
             catch (Exception ex) when (ex is ArgumentException or FormatException)
             { return Results.Problem(statusCode: 400, title: "Charge invalide", detail: ex.Message); }
