@@ -42,6 +42,7 @@ public sealed class Localizer
         ["artifacts_count"] = ("artefact(s)", "artifact(s)"),
         ["updated_by"] = ("par", "by"),
         ["refresh"] = ("Actualiser", "Refresh"),
+        ["feed_created"] = ("Feed créé", "Feed created"),
         ["welcome"] = ("Bienvenue sur", "Welcome to"),
         ["tagline"] = ("Le registre interne des artefacts IA : serveurs MCP, skills, agents, prompts, plugins, hooks.",
                        "The internal registry for AI artifacts: MCP servers, skills, agents, prompts, plugins, hooks."),
