@@ -1,5 +1,6 @@
 @page "/admin"
 @inject AdminService Admin
+@inject UsageService UsageSvc
 @inject Localizer L
 @inject IAuthProvider Auth
 @implements IDisposable
@@ -55,9 +56,41 @@ else if (_d is not null)
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    @if (_usage is not null)
+    {
+        <MudPaper Class="pa-4 mt-3">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h6">@L["usage_title"]</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight:800">@_usage.Total</MudText>
+            </MudStack>
+            @if (_usage.Total == 0) { <MudText Typo="Typo.body2" Color="Color.Secondary">@L["usage_none"]</MudText> }
+            else
+            {
+                var max = Math.Max(1, _usage.Daily.Max(p => p.Count));
+                <div style="display:flex;align-items:flex-end;gap:2px;height:56px;margin:8px 0" aria-hidden="true">
+                    @foreach (var p in _usage.Daily)
+                    {
+                        <div title="@p.Day.ToString("dd/MM") : @p.Count" style="@($"flex:1;background:#0F9D8A;border-radius:2px 2px 0 0;height:{Math.Max(p.Count == 0 ? 2 : 6, 56 * p.Count / max)}px;opacity:{(p.Count == 0 ? .25 : 1)}")"></div>
+                    }
+                </div>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2">@L["usage_by_source"]</MudText>
+                        @foreach (var kv in _usage.BySource.Where(k => k.Value > 0).OrderByDescending(k => k.Value)) { <Bar Label="@kv.Key" Value="kv.Value" Max="_usage.Total" Color="#0F9D8A" /> }
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2">@L["usage_top"]</MudText>
+                        @foreach (var t in _usage.Top.Take(5)) { <Bar Label="@t.Name" Value="t.Count" Max="_usage.Top[0].Count" Color="@TypeStyle.Color(Enum.Parse<ArtifactType>(t.Type))" /> }
+                    </MudItem>
+                </MudGrid>
+            }
+        </MudPaper>
+    }
 }
 
 @code {
+    private UsageSummary? _usage;
     private Dashboard? _d;
     private CurrentUser _user = default!;
 
@@ -65,7 +98,7 @@ else if (_d is not null)
     {
         _user = Auth.GetCurrentUser();
         L.Changed += OnChanged;
-        if (_user.Role >= Role.Moderator) _d = await Admin.DashboardAsync();
+        if (_user.Role >= Role.Moderator) { _d = await Admin.DashboardAsync(); _usage = await UsageSvc.SummaryAsync(30); }
     }
 
     private IEnumerable<(string, int, string)> Kpis() =>

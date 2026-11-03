@@ -64,7 +64,7 @@ public static class Endpoints
         {
             var v = await svc.GetAsync(id);
             if (v is null) return Results.NotFound();
-            await svc.CountDownloadAsync(id);
+            await svc.CountDownloadAsync(id, UsageSources.FromUserAgent(ctx.Request.Headers.UserAgent.ToString()));
             return Zip(v, ctx);
         }).WithName("CatalogDownload");
 
@@ -75,7 +75,7 @@ public static class Endpoints
             var files = v.Files.ToDictionary(f => f.Path, f => f.Content);
             var plan = InstallLayout.Plan(v.Artifact.Type, v.Artifact.Name, target ?? "claude", string.Equals(scope, "global", StringComparison.OrdinalIgnoreCase), files);
             if (plan.Error is not null) return Results.Problem(statusCode: 422, title: "Archive d'installation impossible", detail: plan.Error);
-            await svc.CountDownloadAsync(id);
+            await svc.CountDownloadAsync(id, UsageSources.FromUserAgent(ctx.Request.Headers.UserAgent.ToString()));
             using var ms = new MemoryStream();
             using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
                 foreach (var f in plan.Files)
@@ -94,7 +94,7 @@ public static class Endpoints
         {
             var v = await svc.GetByHashAsync(hash.ToLowerInvariant());
             if (v is null) return Results.NotFound();
-            await svc.CountDownloadAsync(v.Id);
+            await svc.CountDownloadAsync(v.Id, UsageSources.FromUserAgent(ctx.Request.Headers.UserAgent.ToString()));
             return Zip(v, ctx);
         }).WithName("CatalogDownloadByHash");
 

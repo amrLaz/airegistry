@@ -11,7 +11,7 @@ namespace MyRegistry.Web.Services;
 /// Serveur MCP en lecture seule (JSON-RPC 2.0 sur HTTP, sans session) : permet à un agent de chercher, lire et installer des artefacts du registre.
 /// Il ne voit que les versions approuvées et non quarantinées, comme l'API publique du catalogue.
 /// </summary>
-public sealed class McpServer(CatalogService catalog, SettingsService settings)
+public sealed class McpServer(CatalogService catalog, SettingsService settings, UsageService usage)
 {
     public const string ServerName = "myregistry";
 
@@ -122,6 +122,7 @@ public sealed class McpServer(CatalogService catalog, SettingsService settings)
     private async Task<JsonObject> GetAsync(JsonObject a, CancellationToken ct)
     {
         var v = await FindAsync(a, ct);
+        await usage.RecordAsync(v.Id, UsageSources.Mcp, ct: ct);
         var main = v.Files.FirstOrDefault(f => f.Path == v.MainFile) ?? v.Files.OrderBy(f => f.Path, StringComparer.Ordinal).First();
         var meta = new JsonObject
         {

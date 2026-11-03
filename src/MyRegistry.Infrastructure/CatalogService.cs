@@ -12,7 +12,7 @@ public sealed record TransitionResult(bool Found, string? Error, string? Kind);
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
-public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests, SecurityService security, NotificationService notifications, WebhookService webhooks)
+public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests, SecurityService security, NotificationService notifications, WebhookService webhooks, UsageService usage)
 {
     public async Task<PagedResult<CatalogItem>> ListAsync(ArtifactType? type, VersionStatus? status, string? tag, string? q, string? sort,
         bool includeNonPublic, int page, int pageSize, Origin? origin = null, CancellationToken ct = default)
@@ -103,8 +103,12 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
         return (await q.ToListAsync(ct)).OrderByDescending(v => v.CreatedAt).FirstOrDefault();
     }
 
-    public async Task CountDownloadAsync(Guid versionId, CancellationToken ct = default) =>
+    /// <summary>Compte un téléchargement : total à vie de la version et compteur quotidien par source.</summary>
+    public async Task CountDownloadAsync(Guid versionId, string source = UsageSources.Api, CancellationToken ct = default)
+    {
         await db.Versions.Where(v => v.Id == versionId).ExecuteUpdateAsync(s => s.SetProperty(v => v.DownloadCount, v => v.DownloadCount + 1), ct);
+        await usage.RecordAsync(versionId, source, ct: ct);
+    }
 
     public static byte[] Zip(ArtifactVersion v)
     {

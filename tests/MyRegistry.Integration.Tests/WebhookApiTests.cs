@@ -13,18 +13,20 @@ namespace MyRegistry.Integration.Tests;
 public sealed class HookReceiver : IDisposable
 {
     public sealed record Received(string Body, Dictionary<string, string> Headers);
-    private readonly HttpListener _l = new();
+    private HttpListener _l = null!;
     public ConcurrentQueue<Received> Requests { get; } = new();
     public int Status { get; set; } = 200;
     public string Url { get; }
 
     public HookReceiver()
     {
-        var port = new Random().Next(20000, 40000);
-        while (true)
+        // Un HttpListener qui échoue à démarrer est inutilisable : on en crée un nouveau à chaque essai de port.
+        var port = Random.Shared.Next(20000, 40000);
+        for (var attempt = 0; ; attempt++, port = Random.Shared.Next(20000, 40000))
         {
-            try { _l.Prefixes.Clear(); _l.Prefixes.Add($"http://127.0.0.1:{port}/hook/"); _l.Start(); break; }
-            catch (HttpListenerException) { port++; }
+            var l = new HttpListener();
+            try { l.Prefixes.Add($"http://127.0.0.1:{port}/hook/"); l.Start(); _l = l; break; }
+            catch (HttpListenerException) when (attempt < 50) { l.Close(); }
         }
         Url = $"http://127.0.0.1:{port}/hook/";
         _ = Task.Run(Loop);

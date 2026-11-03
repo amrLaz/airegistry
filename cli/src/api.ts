@@ -1,4 +1,5 @@
 import { CliError, type ArtifactType } from './types.js';
+import { CLI_VERSION } from './version.js';
 
 export interface CatalogItem {
   id: string; namespace: string; name: string; type: ArtifactType; version: string; description?: string;
@@ -16,7 +17,7 @@ export class Api {
   constructor(private baseUrl: string, public token?: string, private fetchImpl: typeof fetch = fetch) {}
 
   private async request(pathAndQuery: string, init: RequestInit = {}): Promise<Response> {
-    const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
+    const headers: Record<string, string> = { 'User-Agent': `myregistry-cli/${CLI_VERSION}`, ...(init.headers as Record<string, string>) };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     try {
       return await this.fetchImpl(this.baseUrl + pathAndQuery, { ...init, headers });

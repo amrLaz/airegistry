@@ -925,6 +925,28 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.ToTable("tags", (string)null);
                 });
 
+            modelBuilder.Entity("MyRegistry.Domain.UsageDaily", b =>
+                {
+                    b.Property<DateTime>("Day")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Day", "VersionId", "Source");
+
+                    b.HasIndex("VersionId");
+
+                    b.ToTable("usage_daily", (string)null);
+                });
+
             modelBuilder.Entity("MyRegistry.Domain.VersionFile", b =>
                 {
                     b.Property<Guid>("VersionId")
@@ -1097,6 +1119,15 @@ namespace MyRegistry.Infrastructure.Migrations
                 {
                     b.HasOne("MyRegistry.Domain.ArtifactVersion", null)
                         .WithMany("History")
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MyRegistry.Domain.UsageDaily", b =>
+                {
+                    b.HasOne("MyRegistry.Domain.ArtifactVersion", null)
+                        .WithMany()
                         .HasForeignKey("VersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
