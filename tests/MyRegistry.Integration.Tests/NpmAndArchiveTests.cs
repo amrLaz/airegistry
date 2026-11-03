@@ -46,6 +46,18 @@ public class NpmAndArchiveTests(DbFixture db)
     }
 
     [Fact]
+    public async Task Archive_for_cursor_is_a_rule_and_extra_files_are_reported_in_a_header()
+    {
+        var name = U("cur"); var id = await Publish(name, "1.0.0");
+        var res = await Client().GetAsync($"/api/catalog/{id}/archive?target=cursor");
+        res.EnsureSuccessStatusCode();
+        Assert.Equal([$".cursor/rules/{name}.mdc"], ZipNames(await res.Content.ReadAsByteArrayAsync()));
+        Assert.Contains("1 fichier(s) compl", Uri.UnescapeDataString(res.Headers.GetValues("X-Install-Warnings").Single()));
+        Assert.False((await Client().GetAsync($"/api/catalog/{id}/archive?target=claude")).Headers.Contains("X-Install-Warnings"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Client().GetAsync($"/api/catalog/{id}/archive?target=cursor&scope=global")).StatusCode);
+    }
+
+    [Fact]
     public async Task Archive_refuses_unknown_targets_and_unapproved_versions()
     {
         var c = Client();

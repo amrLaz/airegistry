@@ -86,6 +86,7 @@ public static class Endpoints
                     s.Write(f.Data);
                 }
             ctx.Response.Headers["X-Artifact-Sha256"] = v.ContentHash;
+            if (plan.Warnings is { Count: > 0 }) ctx.Response.Headers["X-Install-Warnings"] = Uri.EscapeDataString(string.Join(" | ", plan.Warnings));
             return Results.File(ms.ToArray(), "application/zip", $"{v.Artifact.Name}-{v.Version}-{(target ?? "claude").ToLowerInvariant()}.zip");
         }).WithName("CatalogArchive");
 

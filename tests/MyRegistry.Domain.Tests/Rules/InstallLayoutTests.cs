@@ -76,4 +76,56 @@ public class InstallLayoutTests
         Assert.NotNull(InstallLayout.Plan(ArtifactType.Plugin, "p", "claude", false, F()).Error);
         Assert.Contains("Cible inconnue", InstallLayout.Plan(ArtifactType.Skill, "p", "vim", false, F(("SKILL.md", "x"))).Error);
     }
+
+    private static string Text(InstallPlan p, int i = 0) => Encoding.UTF8.GetString(p.Files[i].Data);
+
+    [Fact] public void Cursor_skill_becomes_an_agent_requested_rule_with_the_description_and_body()
+    {
+        var p = InstallLayout.Plan(ArtifactType.Skill, "pdf", "cursor", false, F(("SKILL.md", "---\nname: pdf\ndescription: \"Lit des PDF: tout\"\n---\n# PDF\nCorps.\n")));
+        Assert.Null(p.Error);
+        Assert.Equal([".cursor/rules/pdf.mdc"], Paths(p));
+        var mdc = Text(p);
+        Assert.StartsWith("---\ndescription: \"Lit des PDF: tout\"\nalwaysApply: false\n---\n\n# PDF\nCorps.", mdc);
+        Assert.DoesNotContain("name: pdf", mdc);
+        Assert.Empty(p.Warnings!);
+    }
+
+    [Fact] public void Cursor_skill_warns_when_extra_files_cannot_be_installed()
+    {
+        var p = InstallLayout.Plan(ArtifactType.Skill, "pdf", "cursor", false, F(("SKILL.md", "---\ndescription: d\n---\n# x"), ("scripts/a.sh", "echo"), ("README.md", "r")));
+        Assert.Equal([".cursor/rules/pdf.mdc"], Paths(p));
+        Assert.Contains("2 fichier(s)", Assert.Single(p.Warnings!));
+    }
+
+    [Fact] public void Cursor_skill_without_a_description_falls_back_to_the_name_and_quotes_dangerous_values()
+    {
+        Assert.Contains("description: \"pdf\"", Text(InstallLayout.Plan(ArtifactType.Skill, "pdf", "cursor", false, F(("SKILL.md", "# sans frontmatter")))));
+        Assert.Contains("description: \"a \\\"b\\\" # c\"", Text(InstallLayout.Plan(ArtifactType.Skill, "pdf", "cursor", false, F(("SKILL.md", "---\ndescription: a \"b\" # c\n---\n# x")))));
+    }
+
+    [Fact] public void Cursor_prompt_becomes_a_command_without_frontmatter()
+    {
+        var p = InstallLayout.Plan(ArtifactType.Prompt, "resume", "cursor", false, F(("resume.prompt.md", "---\ndescription: d\n---\nRésume ce texte.")));
+        Assert.Equal([".cursor/commands/resume.md"], Paths(p));
+        Assert.Equal("Résume ce texte.\n", Text(p));
+    }
+
+    [Fact] public void Cursor_mcp_goes_to_dot_cursor_mcp_json_and_global_needs_the_cli()
+    {
+        var p = InstallLayout.Plan(ArtifactType.McpServer, "git", "cursor", false, F(("mcp.json", "{\"command\":\"npx\",\"args\":[\"-y\",\"srv\"]}")));
+        Assert.Equal([".cursor/mcp.json"], Paths(p));
+        Assert.Contains("\"mcpServers\"", Text(p));
+        Assert.Contains("CLI", InstallLayout.Plan(ArtifactType.McpServer, "git", "cursor", true, F(("mcp.json", "{\"command\":\"x\"}"))).Error);
+    }
+
+    [Theory]
+    [InlineData(ArtifactType.Agent)] [InlineData(ArtifactType.Hook)]
+    public void Cursor_does_not_support_agents_or_hooks(ArtifactType t) =>
+        Assert.Contains("non supporté", InstallLayout.Plan(t, "x", "cursor", false, F(("a.agent.md", "x"), ("hooks.json", "{}"))).Error);
+
+    [Fact] public void Cursor_global_skills_and_prompts_are_refused()
+    {
+        Assert.NotNull(InstallLayout.Plan(ArtifactType.Skill, "p", "cursor", true, F(("SKILL.md", "x"))).Error);
+        Assert.NotNull(InstallLayout.Plan(ArtifactType.Prompt, "p", "cursor", true, F(("a.prompt.md", "x"))).Error);
+    }
 }

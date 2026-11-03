@@ -13,7 +13,7 @@ Usage : myregistry <commande> [options]
 
   config [--global] [--registry-base-url URL]   affiche / écrit la configuration
   list [-g] | list -r [--type T --search S --tag T --page N --page-size N]
-  add <namespace/nom> [--agent copilot|claude|codex] [-g] [--version V]
+  add <namespace/nom> [--agent copilot|claude|codex|cursor] [-g] [--version V]
   remove <nom> [-g]
   outdated [-g] [--all] [--type T]              code de sortie 1 si mise à jour disponible
   update [namespace/nom] [-g]
