@@ -55,7 +55,7 @@ public static class McpRules
             new JsonObject
             {
                 ["namespace"] = Str("Namespace (défaut : celui du registre)."), ["name"] = Str("Nom de l'artefact."),
-                ["target"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("copilot", "claude", "codex"), ["description"] = "Agent cible (défaut : claude)." },
+                ["target"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("copilot", "claude", "codex", "cursor"), ["description"] = "Agent cible (défaut : claude)." },
             }, "name"),
     ];
 }

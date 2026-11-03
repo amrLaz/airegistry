@@ -26,7 +26,7 @@ const str = (o: Opts, k: string): string | undefined => (typeof o[k] === 'string
 
 function asAgent(v: string | undefined): Agent | undefined {
   if (v === undefined) return undefined;
-  if (!AGENTS.includes(v as Agent)) throw new CliError(`Agent inconnu : ${v} (copilot | claude | codex).`);
+  if (!AGENTS.includes(v as Agent)) throw new CliError(`Agent inconnu : ${v} (copilot | claude | codex | cursor).`);
   return v as Agent;
 }
 
@@ -92,6 +92,7 @@ async function install(ctx: Ctx, slug: string, o: Opts, version?: string): Promi
   const global = !!o.g || !!o.global;
   const agent = asAgent(str(o, 'agent')) ?? detectAgent(ctx.cwd);
   const plan = planInstall(found.type, ref.name, agent, global, files, { cwd: ctx.cwd, home: ctx.home });
+  for (const w of plan.warnings) ctx.err(`AVERT. ${w}`);
   const done = applyPlan(plan);
   const root = rootFor(ctx, global);
   return {

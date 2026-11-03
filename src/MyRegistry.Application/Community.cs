@@ -19,7 +19,7 @@ public sealed record ExportFile(string Path, string Content);
 
 public static class Exports
 {
-    private static string StripFrontmatter(string text)
+    public static string StripFrontmatter(string text)
     {
         var lines = text.Replace("\r\n", "\n").Split('\n');
         if (lines.Length > 1 && lines[0].Trim() == "---")

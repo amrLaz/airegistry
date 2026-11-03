@@ -5,6 +5,7 @@ import { CliError, type Agent, type ArtifactType, AGENTS } from './types.js';
 export type Files = Record<string, Uint8Array>;
 
 export interface Plan {
+  warnings: string[];
   writes: { path: string; data: Uint8Array }[];
   merges: { path: string; topKey: string; entry: string; value: unknown }[];
 }
@@ -18,7 +19,7 @@ const dec = new TextDecoder();
 export function detectAgent(cwd: string): Agent {
   const found = AGENTS.filter((a) => fs.existsSync(path.join(cwd, a === 'copilot' ? '.github' : `.${a}`)));
   if (found.length === 1) return found[0];
-  if (found.length === 0) throw new CliError('Agent cible introuvable : précisez --agent copilot|claude|codex.');
+  if (found.length === 0) throw new CliError('Agent cible introuvable : précisez --agent copilot|claude|codex|cursor.');
   throw new CliError(`Agent cible ambigu (${found.join(', ')}) : précisez --agent.`);
 }
 
@@ -61,7 +62,7 @@ function find(files: Files, pred: (p: string) => boolean): string {
 
 /** Calcule où et comment installer (docs/04, « Emplacements d'installation »). Pur : n'écrit rien. */
 export function planInstall(type: ArtifactType, name: string, agent: Agent, global: boolean, files: Files, ctx: Ctx): Plan {
-  const plan: Plan = { writes: [], merges: [] };
+  const plan: Plan = { warnings: [], writes: [], merges: [] };
   const root = global ? ctx.home : ctx.cwd;
   const put = (rel: string, data: Uint8Array) => plan.writes.push({ path: path.join(root, rel), data });
   const unsupported = (what: string): never => { throw new CliError(`${what} : non supporté pour ${agent}${global ? ' en global' : ''}.`); };
@@ -70,24 +71,42 @@ export function planInstall(type: ArtifactType, name: string, agent: Agent, glob
     case 'Plugin':
       throw new CliError('Les plugins ne s\'installent pas avec « add » : utilisez les commandes natives de votre agent (voir add-registry).');
     case 'Skill': {
+      if (agent === 'cursor') {
+        // Cursor n'a pas de format « skill » : règle « demandée par l'agent » (description + corps).
+        if (global) unsupported('Les skills');
+        const skill = files['SKILL.md'];
+        if (!skill) throw new CliError('SKILL.md introuvable dans l\'archive.');
+        const { fm, body } = frontmatter(dec.decode(skill));
+        put(path.join('.cursor/rules', `${name}.mdc`), enc.encode(`---\ndescription: ${JSON.stringify(fm.description || name)}\nalwaysApply: false\n---\n\n${body.trimEnd()}\n`));
+        const extra = Object.keys(files).filter((p) => p !== 'SKILL.md').length;
+        if (extra > 0) plan.warnings.push(`${extra} fichier(s) complémentaire(s) du skill non installés : Cursor ne charge que la règle (SKILL.md).`);
+        break;
+      }
       const base = agent === 'copilot' ? (global ? '.agents/skills' : '.github/skills') : agent === 'claude' ? '.claude/skills' : '.codex/skills';
       for (const [p, data] of Object.entries(files)) put(path.join(base, name, p), data);
       break;
     }
     case 'Agent': {
+      if (agent === 'cursor') unsupported('Les agents');
       const mdPath = find(files, (p) => p.endsWith('.agent.md') || p === 'AGENTS.md');
       if (agent === 'codex') put(path.join('.codex/agents', `${name}.toml`), enc.encode(agentToToml(name, dec.decode(files[mdPath]))));
       else put(path.join(agent === 'copilot' ? (global ? '.agents/agents' : '.github/agents') : '.claude/agents', `${name}.agent.md`), files[mdPath]);
       break;
     }
     case 'Prompt': {
+      if (agent === 'cursor') {
+        if (global) unsupported('Les prompts');
+        const pf = files[find(files, (p) => p.endsWith('.prompt.md'))];
+        put(path.join('.cursor/commands', `${name}.md`), enc.encode(`${frontmatter(dec.decode(pf)).body.trimEnd()}\n`));
+        break;
+      }
       if (agent !== 'copilot') unsupported('Les prompts');
       if (global) unsupported('Les prompts');
       put(path.join('.github/prompts', `${name}.prompt.md`), files[find(files, (p) => p.endsWith('.prompt.md'))]);
       break;
     }
     case 'Hook': {
-      if (agent === 'codex') unsupported('Les hooks');
+      if (agent === 'codex' || agent === 'cursor') unsupported('Les hooks');
       if (global) unsupported('Les hooks');
       if (agent === 'copilot') put('.github/hooks/hooks.json', files['hooks.json']);
       else for (const [p, data] of Object.entries(files)) put(path.join('.claude/hooks', name, p), data);
@@ -100,6 +119,8 @@ export function planInstall(type: ArtifactType, name: string, agent: Agent, glob
         plan.merges.push({ path: path.join(ctx.cwd, '.vscode/mcp.json'), topKey: 'servers', entry: name, value: entry });
       } else if (agent === 'claude') {
         plan.merges.push({ path: global ? path.join(ctx.home, '.claude.json') : path.join(ctx.cwd, '.mcp.json'), topKey: 'mcpServers', entry: name, value: entry });
+      } else if (agent === 'cursor') {
+        plan.merges.push({ path: path.join(root, '.cursor/mcp.json'), topKey: 'mcpServers', entry: name, value: entry });
       } else {
         plan.merges.push({ path: path.join(root, '.codex/mcp.json'), topKey: 'mcpServers', entry: name, value: entry });
       }

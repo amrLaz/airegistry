@@ -30,6 +30,7 @@ Variables : `MYREGISTRY_BASE_URL`, `MYREGISTRY_API_TOKEN`.
 **Claude Code** : skill `.claude/skills/{name}/SKILL.md` (global `~/.claude/skills/`) ; agent `.claude/agents/{name}.agent.md` ; hook `.claude/hooks/` (global fusionné dans `~/.claude/settings.json`) ; mcp `.mcp.json` (global `~/.claude.json`).
 **Codex** : skill `.codex/skills/{name}/SKILL.md` ; agent `.codex/agents/{name}.toml` ; mcp `.codex/mcp.json`.
 Prompts : Copilot seulement. Hooks : Copilot et Claude Code seulement.
+**Cursor** (local uniquement, **à valider contre l'outil**) : skill → règle `.cursor/rules/{name}.mdc` (description + corps, `alwaysApply: false` ; les fichiers complémentaires ne sont pas installés et un avertissement le dit) ; prompt → commande `.cursor/commands/{name}.md` ; mcp → `.cursor/mcp.json` (global : `~/.cursor/mcp.json`). Agents et hooks : non supportés.
 **Plugins** : `add` n'installe rien ; assistant qui demande l'agent cible et affiche les commandes natives. `update`/`remove`/`outdated --type Plugin` refusés.
 
 ## Authentification
