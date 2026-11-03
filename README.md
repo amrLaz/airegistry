@@ -36,6 +36,18 @@ node dist/index.js list && node dist/index.js outdated
 ```
 Commandes disponibles : `config`, `list [-r]`, `add`, `remove`, `outdated`, `update`, `pack`, `check`, `publish [--dry-run]`, `login`, `edit`, `add-registry`, `version`. Pas encore : `completion`.
 
+## Authentification Entra ID (production)
+Par défaut l'utilisateur est factice (Admin) : **ne l'exposez jamais sur un réseau partagé**. Pour activer Entra ID :
+```bash
+export MYREGISTRY_AUTH_MODE=oidc
+export MYREGISTRY_OIDC_TENANT=<id-du-tenant>            # ou MYREGISTRY_OIDC_AUTHORITY=https://…/v2.0
+export MYREGISTRY_OIDC_CLIENT_ID=<id-de-l-application>
+export MYREGISTRY_OIDC_CLIENT_SECRET=<secret>            # jamais dans le dépôt : variable d'environnement, puis Key Vault
+export MYREGISTRY_BOOTSTRAP_ADMINS=prenom.nom@exemple.com   # administrateurs au premier login (liste séparée par des virgules)
+export MYREGISTRY_OIDC_ALLOWED_DOMAINS=exemple.com       # facultatif : restreint les domaines de messagerie
+```
+Dans l'inscription d'application Entra ID : type **Web**, URI de redirection `https://<votre-url>/signin-oidc`, URI de déconnexion `https://<votre-url>/signout-callback-oidc`. Les rôles restent gérés en base (page Utilisateurs) : le jeton ne donne jamais de droits. L'application refuse de démarrer si la configuration est incomplète.
+
 ## Avec PostgreSQL (plus tard)
 ```bash
 docker compose up -d db

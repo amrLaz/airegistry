@@ -71,7 +71,7 @@ public class CliAuthTests(DbFixture db)
 
         var bad = await Bearer("mrt_doesnotexist").GetFromJsonAsync<JsonElement>("/api/me");
         Assert.False(bad.GetProperty("authenticated").GetBoolean());
-        Assert.Equal(HttpStatusCode.Forbidden, (await Bearer("mrt_doesnotexist").PostAsJsonAsync("/api/import", new { type = "Skill" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Bearer("mrt_doesnotexist").PostAsJsonAsync("/api/import", new { type = "Skill" })).StatusCode);
     }
 
     private async Task<string> IssueFor(string email, string kind, TimeSpan ttl)

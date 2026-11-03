@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using MyRegistry.Application;
 using MyRegistry.Domain;
 using MyRegistry.Infrastructure;
@@ -11,12 +12,18 @@ public static class CliEndpoints
     public static void MapCliApi(this WebApplication app)
     {
         // Flux navigateur : le jeton (1 minute) n'est remis qu'à un serveur local ouvert par la CLI, avec le « state » reçu.
-        app.MapGet("/cli/auth", async (string? callback, string? state, CliTokenService tokens, IAuthProvider auth) =>
+        app.MapGet("/cli/auth", async (string? callback, string? state, CliTokenService tokens, IAuthProvider auth, HttpContext ctx, MyRegistry.Web.Services.AuthModeOptions mode) =>
         {
             if (!CliAuthRules.IsValidCallback(callback)) return Results.Problem(statusCode: 400, title: "Callback invalide", detail: "Le callback doit être http://localhost:<port>/… (port ≥ 1024).");
             if (!CliAuthRules.IsValidState(state)) return Results.Problem(statusCode: 400, title: "State invalide", detail: "8 à 128 caractères : lettres, chiffres, _ et -.");
             var user = auth.GetCurrentUser();
-            if (!user.IsAuthenticated) return Results.Problem(statusCode: 401, title: "Connexion requise");
+            if (!user.IsAuthenticated)
+            {
+                // Connexion Entra ID puis retour sur cette même URL ; en développement il n'y a personne à connecter.
+                if (!mode.Oidc || !string.IsNullOrEmpty(user.Email)) return Results.Problem(statusCode: string.IsNullOrEmpty(user.Email) ? 401 : 403, title: "Connexion requise");
+                await ctx.ChallengeAsync(MyRegistry.Web.Services.OidcSetup.Scheme, new Microsoft.AspNetCore.Authentication.AuthenticationProperties { RedirectUri = ctx.Request.Path + ctx.Request.QueryString });
+                return Results.Empty;
+            }
             var issued = await tokens.IssueAsync(user.Email, "interactive", CliAuthRules.InteractiveTtl, null);
             return Results.Redirect(CliAuthRules.RedirectUrl(callback!, issued.Token, state!));
         }).WithTags("CLI").WithName("CliAuth");

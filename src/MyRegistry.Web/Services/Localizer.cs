@@ -85,6 +85,7 @@ public sealed class Localizer
         ["setup_summary"] = ("Intégrer ce registre comme marketplace", "Use this registry as a marketplace"),
         ["setup_feed_added"] = ("Feed ajouté", "Feed added"),
         ["setup_public_url"] = ("URL publique (facultatif)", "Public URL (optional)"),
+        ["logout"] = ("Se déconnecter", "Sign out"),
         ["welcome"] = ("Bienvenue sur", "Welcome to"),
         ["tagline"] = ("Le registre interne des artefacts IA : serveurs MCP, skills, agents, prompts, plugins, hooks.",
                        "The internal registry for AI artifacts: MCP servers, skills, agents, prompts, plugins, hooks."),
