@@ -71,6 +71,15 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
         return (ns, name);
     }
 
+    /// <summary>Versions approuvées et non quarantinées d'une famille (alias de namespace résolus), avec leurs fichiers.</summary>
+    public async Task<IReadOnlyList<ArtifactVersion>> ApprovedVersionsAsync(string ns, string name, ArtifactType type, CancellationToken ct = default)
+    {
+        (ns, name) = await ResolveAliasAsync(ns, name, ct);
+        return (await db.Versions.Include(v => v.Artifact).Include(v => v.Files)
+            .Where(v => v.Artifact.Namespace == ns && v.Artifact.Name == name && v.Artifact.Type == type && v.Status == VersionStatus.Approved && !v.Quarantined)
+            .ToListAsync(ct)).OrderBy(v => v.CreatedAt).ToList();
+    }
+
     public async Task<ArtifactVersion?> GetByNameAsync(string ns, string name, string? version, CancellationToken ct = default)
     {
         (ns, name) = await ResolveAliasAsync(ns, name, ct);

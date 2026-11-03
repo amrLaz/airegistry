@@ -64,6 +64,27 @@ public static class Endpoints
             return Zip(v, ctx);
         }).WithName("CatalogDownload");
 
+        catalog.MapGet("/{id:guid}/archive", async (Guid id, string? target, string? scope, CatalogService svc, HttpContext ctx) =>
+        {
+            var v = await svc.GetAsync(id);
+            if (v is null || v.Status != VersionStatus.Approved || v.Quarantined) return Results.NotFound();
+            var files = v.Files.ToDictionary(f => f.Path, f => f.Content);
+            var plan = InstallLayout.Plan(v.Artifact.Type, v.Artifact.Name, target ?? "claude", string.Equals(scope, "global", StringComparison.OrdinalIgnoreCase), files);
+            if (plan.Error is not null) return Results.Problem(statusCode: 422, title: "Archive d'installation impossible", detail: plan.Error);
+            await svc.CountDownloadAsync(id);
+            using var ms = new MemoryStream();
+            using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
+                foreach (var f in plan.Files)
+                {
+                    var entry = zip.CreateEntry(f.Path);
+                    entry.LastWriteTime = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+                    using var s = entry.Open();
+                    s.Write(f.Data);
+                }
+            ctx.Response.Headers["X-Artifact-Sha256"] = v.ContentHash;
+            return Results.File(ms.ToArray(), "application/zip", $"{v.Artifact.Name}-{v.Version}-{(target ?? "claude").ToLowerInvariant()}.zip");
+        }).WithName("CatalogArchive");
+
         catalog.MapGet("/by-hash/{hash}/download", async (string hash, CatalogService svc, HttpContext ctx) =>
         {
             var v = await svc.GetByHashAsync(hash.ToLowerInvariant());

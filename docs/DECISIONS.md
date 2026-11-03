@@ -179,3 +179,8 @@
 
 ## Modération des commentaires
 - Suppression : l'auteur ou un Moderator+ (`DELETE /api/catalog/{id}/comments/{commentId}`, audité). Signalement : `POST …/report`, un signalant ne compte qu'une fois, on ne signale pas son propre commentaire ; ≥ 3 signalants distincts → commentaire masqué (`Hidden`) en attendant la modération. Table `comment_reports` (migration `CommentReports`).
+
+## Surface npm et archive installable
+- **npm** : `GET /skills/@{namespace}/{nom}` (packument : `dist-tags.latest` = plus haute version SemVer, `dist.tarball/shasum/integrity`) et `GET /skills/@{namespace}/{nom}/-/{nom}-{version}.tgz`. Skills uniquement, versions approuvées non quarantinées ; la forme `/skills/@ns%2fnom` envoyée par `npm view` est acceptée. Tarball déterministe (`package/` + fichiers + `package.json` généré, qui remplace celui du skill ; dates et droits fixés). L'URL des tarballs vient du réglage d'URL publique, à défaut de la requête. Vérifié avec le vrai client : `npm view` et `npm pack --registry …/skills`.
+- **Archive** : `GET /api/catalog/{id}/archive?target=copilot|claude|codex&scope=local|global` — ZIP aux chemins d'installation de docs/04. Refus 422 : plugins (voir `/api/plugins/…/download`), agents Codex (conversion .toml faite par la CLI), MCP global Claude (fusion dans `~/.claude.json` par la CLI), prompts/hooks hors des cibles supportées. Version approuvée non quarantinée uniquement.
+- Les exports `cursorrules`, `claude-desktop` et `audit-prompt` existaient déjà (phase 1).
