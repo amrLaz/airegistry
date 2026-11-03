@@ -1,6 +1,7 @@
 @page "/admin/config"
 @inject SettingsService Settings
 @inject SnapshotService Snapshots
+@inject RetentionService Retention
 @inject SettingsCache Cache
 @inject Localizer L
 @inject IAuthProvider Auth
@@ -37,9 +38,39 @@ else
         @foreach (var e in _snapErrors) { <MudAlert Severity="Severity.Error" Dense Class="mb-2"><code>@e.Code</code> @e.Message</MudAlert> }
         <MudButton Variant="Variant.Outlined" OnClick="PublishSnapshot" Disabled="_busy">@L["snapshot_publish"]</MudButton>
     </MudPaper>
+
+    <MudPaper Class="pa-4 mt-3" Style="max-width:640px">
+        <MudText Typo="Typo.h6">@L["ret_title"]</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="my-2">@L["ret_intro"]</MudText>
+        <MudStack Row Spacing="2" Wrap="Wrap.Wrap">
+            <MudNumericField T="int" @bind-Value="_keep" Label="@L["ret_keep"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="1000" Style="max-width:300px" />
+            <MudNumericField T="int" @bind-Value="_age" Label="@L["ret_age"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="7" Max="3650" Style="max-width:240px" />
+        </MudStack>
+        @foreach (var e in _retErrors) { <MudAlert Severity="Severity.Error" Dense Class="mt-2"><code>@e.Code</code> @e.Message</MudAlert> }
+        <MudStack Row Spacing="2" Class="mt-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveRetention">@L["save"]</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="PreviewRetention">@L["ret_preview"]</MudButton>
+            @if (_ret is { Items.Count: > 0 })
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="RunRetention">@(_retConfirm ? L["ret_confirm"] : L["ret_run"])</MudButton>
+            }
+        </MudStack>
+        @if (_ret is not null)
+        {
+            @if (_ret.Items.Count == 0) { <MudText Typo="Typo.body2" Class="mt-2">@L["ret_nothing"]</MudText> }
+            @foreach (var i in _ret.Items)
+            {
+                <MudText Typo="Typo.caption" Style="font-family:monospace;display:block">@i.Artifact@@@i.Version · @i.Reason</MudText>
+            }
+        }
+    </MudPaper>
 }
 
 @code {
+    private int _keep, _age = 90;
+    private RetentionPreview? _ret;
+    private bool _retConfirm;
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _retErrors = [];
     private string _title = "", _ns = "", _url = "", _repo = "";
     private SnapshotStatus? _status;
     private bool _busy;
@@ -55,6 +86,25 @@ else
         var s = await Settings.GetAllAsync();
         _title = s.GetValueOrDefault(SettingKeys.Title, ""); _ns = s.GetValueOrDefault(SettingKeys.DefaultNamespace, ""); _url = s.GetValueOrDefault(SettingKeys.PublicUrl, ""); _repo = s.GetValueOrDefault(SettingKeys.MarketplaceRepo, "");
         _status = await Snapshots.StatusAsync();
+        _keep = int.TryParse(s.GetValueOrDefault(SettingKeys.RetentionKeepVersions), out var k) ? k : 0;
+        _age = int.TryParse(s.GetValueOrDefault(SettingKeys.RetentionMinAgeDays), out var a) ? a : 90;
+    }
+
+    private async Task SaveRetention()
+    {
+        _retErrors = await Settings.UpdateAsync(new Dictionary<string, string>
+            { [SettingKeys.RetentionKeepVersions] = _keep.ToString(), [SettingKeys.RetentionMinAgeDays] = _age.ToString() }, _user.Email);
+        if (_retErrors.Count == 0) { Snack.Add(L["saved"], Severity.Success); _ret = null; _retConfirm = false; }
+    }
+
+    private async Task PreviewRetention() { _ret = await Retention.PreviewAsync(); _retConfirm = false; }
+
+    private async Task RunRetention()
+    {
+        if (!_retConfirm) { _retConfirm = true; return; }
+        var r = await Retention.RunAsync(_user.Email);
+        Snack.Add($"{r.Deleted} {L["ret_deleted"]}", Severity.Success);
+        _retConfirm = false; _ret = await Retention.PreviewAsync();
     }
 
     private async Task Save()

@@ -246,3 +246,9 @@
 - **Restitution** : `GET /api/admin/usage?days=` (Moderator+, 30 jours par défaut, 365 au plus) : total, par source, par type, top 10, série quotidienne **sans trous** ; carte « Usage » sur le tableau de bord admin. La synthèse est bornée des deux côtés de la fenêtre (un test a révélé qu'elle ne l'était pas en haut).
 - **Pas de données personnelles** : aucun utilisateur, IP ni nom de machine n'est enregistré.
 - **Ce n'est pas le cockpit d'orchestration** : le backlog demande de « définir la grille d'étalonnage avant » ; elle n'est pas définie, donc le cockpit (suivi de runs, étalonnage, fusion de sessions) n'est pas construit. Cette table en est le socle de mesure.
+
+## Rétention des versions
+- **Prudente par construction** : désactivée par défaut (`retention_keep_versions` = 0). Activée, elle ne supprime que des versions **dépréciées**, plus anciennes que `retention_min_age_days` (90 par défaut, **7 au plus bas**, même si on en demande moins), hors des N plus récentes de leur artefact et hors de la plus haute version SemVer. Elle ne touche **jamais** une version approuvée, en attente ou à revoir.
+- **Protections** : une version **épinglée par un composant de plugin** (`plugin_components`, même si le plugin est déprécié), avec une **PR de gouvernance ouverte** ou un **signalement ouvert** est conservée.
+- **Usage** : `GET /api/admin/retention` donne l'aperçu sans rien supprimer ; `POST /api/admin/retention/run` exige `{ "confirm": true }` ; la page Configuration propose Aperçu puis Supprimer (double clic de confirmation). Le job `retention` tourne chaque nuit et applique le même calcul, sous verrou. Chaque suppression est auditée (`retention-delete`, avec la raison) ; fichiers, historique et compteurs d'usage partent en cascade.
+- **Non fait** : suppression des signalements et commentaires rattachés (ils restent), rétention par type d'artefact, archivage avant suppression (la suppression est définitive).

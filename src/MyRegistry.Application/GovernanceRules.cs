@@ -54,11 +54,15 @@ public static class SettingsRules
                     errors.Add(new(k, "URL publique invalide (http ou https).")); break;
                 case SettingKeys.MarketplaceRepo when v.Length > 0 && RepoLocation.ToLocalPath(v) is null:
                     errors.Add(new(k, "Dépôt du snapshot : chemin absolu ou file:///chemin (les dépôts distants arrivent en phase 5).")); break;
+                case SettingKeys.RetentionKeepVersions when !int.TryParse(v, out var keep) || keep is < 0 or > RetentionPolicy.MaxKeep:
+                    errors.Add(new(k, $"Versions conservées : entier de 0 (désactivé) à {RetentionPolicy.MaxKeep}.")); break;
+                case SettingKeys.RetentionMinAgeDays when !int.TryParse(v, out var age) || age < RetentionPolicy.MinAgeFloorDays || age > RetentionPolicy.MaxAgeDays:
+                    errors.Add(new(k, $"Âge minimal : {RetentionPolicy.MinAgeFloorDays} à {RetentionPolicy.MaxAgeDays} jours.")); break;
                 case SettingKeys.ContactEmail when v.Length > 0 && (v.Length > 200 || !ContactMail.IsMatch(v)):
                     errors.Add(new(k, "Courriel de contact invalide.")); break;
                 case SettingKeys.SecurityScanEnabled when v is not ("true" or "false"):
                     errors.Add(new(k, "Valeur attendue : true ou false.")); break;
-                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo or SettingKeys.SecurityScanEnabled or SettingKeys.ContactEmail):
+                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo or SettingKeys.SecurityScanEnabled or SettingKeys.ContactEmail or SettingKeys.RetentionKeepVersions or SettingKeys.RetentionMinAgeDays):
                     errors.Add(new(k, "Réglage inconnu.")); break;
             }
         }
