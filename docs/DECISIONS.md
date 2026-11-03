@@ -164,3 +164,10 @@
 
 ## Azure DevOps sans jeton valide
 - Un appel sans jeton valide renvoie 203 + page HTML de connexion : traité comme un refus d'accès (avant, `JsonException` brute). Toute réponse non JSON donne un message explicite (renseigner « Variable du jeton » MYREGISTRY_… et l'exporter avant de lancer l'appli).
+
+## Notifications in-app
+- Entités `notifications` et `notification_preferences` (migration `Notifications`). Le texte n'est pas stocké : type + sujet (`ns/nom@version`) + détail, composés à l'affichage en FR/EN.
+- Événements : changement de statut (→ auteur de la version), nouvelle soumission et signalement (→ utilisateurs actifs Moderator et plus), commentaire (→ auteurs des versions de la famille). L'auteur de l'action n'est jamais notifié. Tout est activé par défaut ; une préférence à `false` désactive un type.
+- Les notifications sont ajoutées au contexte et sauvegardées avec la transaction de l'action métier ; pas de notification sans l'action.
+- API : `/api/notifications` (liste, unread-count, read, archive, suppression, actions en masse, préférences). Les données sont toujours limitées à l'utilisateur courant.
+- Pas de courriel ni de push : hors périmètre ; le modèle laisse la place à un canal supplémentaire.

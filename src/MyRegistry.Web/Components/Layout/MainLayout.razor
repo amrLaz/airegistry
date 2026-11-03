@@ -44,14 +44,24 @@
             </MudHidden>
         }
 
-        @if (_user.Role >= Role.Moderator)
-        {
-            <MudTooltip Text="@(_pending > 0 ? $"{_pending} {L["pending_review"]}" : L["no_notifications"])">
-                <MudBadge Content="_pending" Visible="@(_pending > 0)" Color="Color.Error" Overlap="true" Class="mx-1">
-                    <MudIconButton Icon="@Icons.Material.Filled.Notifications" Href="/admin/moderation" aria-label="@L["notifications"]" />
-                </MudBadge>
-            </MudTooltip>
-        }
+        <MudBadge Content="_unread" Visible="@(_unread > 0)" Color="Color.Error" Overlap="true" Class="mx-1">
+            <MudMenu Icon="@Icons.Material.Filled.Notifications" AnchorOrigin="MudBlazor.Origin.BottomRight" TransformOrigin="MudBlazor.Origin.TopRight" aria-label="@L["notifications"]">
+                <MudText Typo="Typo.overline" Class="px-4" Color="Color.Secondary">@L["notif_title"]</MudText>
+                @if (_recent.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="px-4 py-2" Color="Color.Secondary">@L["notif_empty"]</MudText>
+                }
+                @foreach (var n in _recent)
+                {
+                    var nn = n;
+                    <MudMenuItem OnClick="() => OpenNotification(nn)">
+                        <span style="@(nn.Read ? "opacity:.6" : "font-weight:600");white-space:normal;display:block;max-width:320px">@NotificationText.Compose(nn, L.Lang == "fr")</span>
+                    </MudMenuItem>
+                }
+                <MudDivider Class="my-1" />
+                <MudMenuItem Href="/notifications" Icon="@Icons.Material.Filled.Inbox">@L["notif_all"]</MudMenuItem>
+            </MudMenu>
+        </MudBadge>
         <MudIconButton Icon="@(_dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
                        OnClick="() => _dark = !_dark" aria-label="@L["theme"]" />
         <MudIconButton Icon="@Icons.Material.Filled.Language" OnClick="L.Toggle" aria-label="@L["lang"]" title="@(L.Lang == "fr" ? "EN" : "FR")" />
@@ -60,6 +70,7 @@
                 <MudText Typo="Typo.caption" Class="px-4 py-1" Color="Color.Secondary">@_user.Email (@_user.Role)</MudText>
                 <MudDivider />
                 <MudMenuItem Href="/my" Icon="@Icons.Material.Filled.Upload">@L["my_pubs"]</MudMenuItem>
+                <MudMenuItem Href="/notifications" Icon="@Icons.Material.Filled.Notifications">@L["notif_title"]</MudMenuItem>
                 @if (_user.Role >= Role.Publisher) { <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Extension">@L["plugin_editor"]</MudMenuItem> }
                 @if (_user.Role >= Role.Moderator)
                 {
@@ -111,6 +122,7 @@
         <MudDivider Class="my-1" />
         <MudText Typo="Typo.overline" Class="px-4" Color="Color.Secondary">@L["create_section_edit"]</MudText>
         <MudMenuItem Href="/my" Icon="@Icons.Material.Filled.Upload">@L["my_pubs"]</MudMenuItem>
+                <MudMenuItem Href="/notifications" Icon="@Icons.Material.Filled.Notifications">@L["notif_title"]</MudMenuItem>
         <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Tune">@L["plugin_editor"]</MudMenuItem>
     </text>;
 
@@ -125,6 +137,8 @@
     private string _title = "MyRegistry";
     private string? _q;
     private int _pending;
+    private int _unread;
+    private IReadOnlyList<NotificationDto> _recent = [];
     private char Initial => _title.Length > 0 ? char.ToUpperInvariant(_title[0]) : 'M';
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
@@ -136,6 +150,23 @@
         Nav.LocationChanged += OnLocation;
         _title = await Settings.TitleAsync();
         await LoadPending();
+        await LoadNotifications();
+    }
+
+    private async Task LoadNotifications()
+    {
+        using var scope = Scopes.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<NotificationService>();
+        _unread = await svc.UnreadCountAsync(_user.Email);
+        _recent = await svc.ListAsync(_user.Email, false, 6);
+    }
+
+    private async Task OpenNotification(NotificationDto n)
+    {
+        using (var scope = Scopes.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<NotificationService>().MarkReadAsync(_user.Email, n.Id);
+        await LoadNotifications();
+        if (!string.IsNullOrEmpty(n.Link)) Nav.NavigateTo(n.Link);
     }
 
     // Scope dédié : le DbContext du circuit est utilisé en parallèle par la page.
@@ -148,7 +179,7 @@
     }
 
     private void OnLocation(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
-        InvokeAsync(async () => { await LoadPending(); StateHasChanged(); });
+        InvokeAsync(async () => { await LoadPending(); await LoadNotifications(); StateHasChanged(); });
 
     private void OnSearchKey(KeyboardEventArgs e)
     {

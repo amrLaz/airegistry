@@ -12,7 +12,7 @@ public sealed record TransitionResult(bool Found, string? Error, string? Kind);
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
-public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests, SecurityService security)
+public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullRequestWorkflow pullRequests, SecurityService security, NotificationService notifications)
 {
     public async Task<PagedResult<CatalogItem>> ListAsync(ArtifactType? type, VersionStatus? status, string? tag, string? q, string? sort,
         bool includeNonPublic, int page, int pageSize, Origin? origin = null, CancellationToken ct = default)
@@ -115,6 +115,9 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
         v.Status = to;
         marketplace.Invalidate();
         db.Audit.Add(new AuditEntry { UserId = userId, Action = "status", Entity = "ArtifactVersion", EntityId = id.ToString(), Details = to.ToString() });
+        var family = await db.Artifacts.AsNoTracking().FirstAsync(a => a.Id == v.ArtifactId, ct);
+        await notifications.AddAsync([v.CreatedBy], userId, NotificationKind.StatusChanged,
+            NotificationRules.Subject(family.Namespace, family.Name, v.Version), to.ToString(), NotificationRules.ArtifactLink(id), ct);
         await db.SaveChangesAsync(ct);
         return new(true, null, null);
     }
