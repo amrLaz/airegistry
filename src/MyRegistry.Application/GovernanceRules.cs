@@ -36,6 +36,7 @@ public static class GovernancePolicy
 public static class SettingsRules
 {
     private static readonly Regex Ns = new("^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.Compiled);
+    private static readonly Regex ContactMail = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
 
     /// <summary>Valide un lot de réglages ; ne retourne que les erreurs.</summary>
     public static IReadOnlyList<Issue> Validate(IReadOnlyDictionary<string, string> values)
@@ -53,9 +54,11 @@ public static class SettingsRules
                     errors.Add(new(k, "URL publique invalide (http ou https).")); break;
                 case SettingKeys.MarketplaceRepo when v.Length > 0 && RepoLocation.ToLocalPath(v) is null:
                     errors.Add(new(k, "Dépôt du snapshot : chemin absolu ou file:///chemin (les dépôts distants arrivent en phase 5).")); break;
+                case SettingKeys.ContactEmail when v.Length > 0 && (v.Length > 200 || !ContactMail.IsMatch(v)):
+                    errors.Add(new(k, "Courriel de contact invalide.")); break;
                 case SettingKeys.SecurityScanEnabled when v is not ("true" or "false"):
                     errors.Add(new(k, "Valeur attendue : true ou false.")); break;
-                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo or SettingKeys.SecurityScanEnabled):
+                case not (SettingKeys.Title or SettingKeys.DefaultNamespace or SettingKeys.PublicUrl or SettingKeys.MarketplaceRepo or SettingKeys.SecurityScanEnabled or SettingKeys.ContactEmail):
                     errors.Add(new(k, "Réglage inconnu.")); break;
             }
         }

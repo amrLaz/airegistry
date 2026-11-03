@@ -23,5 +23,8 @@ public sealed class SettingsCache(IServiceScopeFactory scopes)
 
     public async Task<string> TitleAsync() => (await GetAsync()).GetValueOrDefault(SettingKeys.Title) ?? "MyRegistry";
     public async Task<string> DefaultNamespaceAsync() => (await GetAsync()).GetValueOrDefault(SettingKeys.DefaultNamespace) ?? "myregistry";
-    public void Invalidate() => _values = null;
+    /// <summary>Levé quand les réglages changent : les layouts ouverts rechargent le titre sans que l'utilisateur recharge la page.</summary>
+    public event Action? Changed;
+
+    public void Invalidate() { _values = null; Changed?.Invoke(); }
 }

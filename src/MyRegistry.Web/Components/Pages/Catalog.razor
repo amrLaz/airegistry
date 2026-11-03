@@ -2,6 +2,8 @@
 @inject CatalogService Svc
 @inject Localizer L
 @inject IAuthProvider Auth
+@inject SetupService Setup
+@inject NavigationManager Nav
 @implements IDisposable
 
 <PageTitle>MyRegistry</PageTitle>
@@ -184,6 +186,8 @@
     {
         _user = Auth.GetCurrentUser();
         L.Changed += OnChanged;
+        // Instance vierge : l'Admin est dirigé vers l'assistant de premier lancement.
+        if (_user.Role == Role.Admin && (await Setup.StatusAsync(_user.Role)).Needed) Nav.NavigateTo("/setup");
     }
 
     protected override async Task OnParametersSetAsync()
