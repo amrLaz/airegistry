@@ -1,4 +1,4 @@
-# Sur chaque PR qui touche l'infra : montre ce qui changerait (what-if) avant la fusion.
+# Sur chaque PR qui touche l'infra : montre ce que Terraform changerait (plan, lecture seule) avant la fusion.
 name: Infra preview
 on:
   pull_request:
@@ -9,24 +9,35 @@ permissions:
   contents: read
   pull-requests: read
 
+env:
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  TF_VAR_db_admin_password: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+  TF_VAR_oidc_client_secret: ${{ secrets.MYREGISTRY_OIDC_CLIENT_SECRET }}
+
 jobs:
-  what-if:
+  plan:
     runs-on: ubuntu-latest
     # base main -> prod ; base develop (ou autre) -> dev
     environment: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/login@v2
+      - uses: hashicorp/setup-terraform@v3
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: What-if
+          terraform_version: "~> 1.9"
+      - name: Init
         env:
-          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+          TARGET: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
+        run: terraform init -input=false -backend-config="envs/${TARGET}.backend.hcl"
+      - name: "Plan (sans verrou, aucune écriture)"
+        env:
           TARGET: ${{ github.base_ref == 'main' && 'prod' || 'dev' }}
         run: |
-          az deployment group what-if \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --parameters "infra/params/${TARGET}.bicepparam" | tee what-if.txt
-          { echo '### What-if ('"$TARGET"')'; echo '```'; cat what-if.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          terraform plan -input=false -lock=false -no-color -var-file="envs/${TARGET}.tfvars" | tee plan.txt
+          { echo '### Plan Terraform ('"$TARGET"')'; echo '```'; tail -n 200 plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

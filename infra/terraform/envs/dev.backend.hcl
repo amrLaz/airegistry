@@ -4,3 +4,4 @@ storage_account_name = "stmyregistrytfstate"
 container_name       = "tfstate"
 key                  = "dev.tfstate"
 use_oidc             = true
+use_azuread_auth     = true # le compte d'état n'a pas de clé d'accès

@@ -1,4 +1,4 @@
-# Promotion vers la prod = une PR vers main qui épingle le tag d'image dans infra/params/prod.bicepparam.
+# Promotion vers la prod = une PR vers main qui épingle le tag d'image dans infra/terraform/envs/prod.tfvars.
 name: Promote to prod
 on:
   workflow_dispatch:
@@ -28,7 +28,8 @@ jobs:
           git config user.name "amr.lazraq"
           git config user.email "lazraq.amr.94@gmail.com"
           git checkout -b "$branch"
-          sed -i "s/^param imageTag = '.*'/param imageTag = '${SHA}'/" infra/params/prod.bicepparam
+          sed -i "s/^\(image_tag[[:space:]]*=[[:space:]]*\)\".*\"/\1\"${SHA}\"/" infra/terraform/envs/prod.tfvars
+          grep -q "\"${SHA}\"" infra/terraform/envs/prod.tfvars || { echo "image_tag introuvable dans prod.tfvars"; exit 1; }
           git commit -am "chore(deploy): promote ${SHA:0:7} to prod"
           git push origin "$branch"
           gh pr create --base main --head "$branch" \

@@ -45,10 +45,17 @@ jobs:
 
   infra-lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
-      - name: Bicep build (valide la syntaxe de main.bicep et des paramètres)
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+      - name: Format
+        run: terraform fmt -check -recursive
+      - name: Init (sans backend) et validation
         run: |
-          az bicep install
-          az bicep build --file infra/main.bicep --stdout > /dev/null
-          for f in infra/params/*.bicepparam; do az bicep build-params --file "$f" --stdout > /dev/null; done
+          terraform init -backend=false -input=false
+          terraform validate

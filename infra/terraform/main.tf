@@ -44,6 +44,31 @@ resource "azurerm_role_assignment" "acr_pull" {
   principal_id         = azurerm_user_assigned_identity.app.principal_id
 }
 
+# Stockage d'objets (IBlobStore). Accès par identité managée uniquement : pas de clé d'accès, pas d'accès anonyme.
+resource "azurerm_storage_account" "blobs" {
+  name                            = var.storage_account_name
+  location                        = var.location
+  resource_group_name             = data.azurerm_resource_group.env.name
+  account_tier                    = "Standard"
+  account_replication_type        = var.environment_name == "prod" ? "GRS" : "LRS"
+  min_tls_version                 = "TLS1_2"
+  allow_nested_items_to_be_public = false
+  shared_access_key_enabled       = false
+  tags                            = local.tags
+}
+
+resource "azurerm_storage_container" "app" {
+  name                  = "myregistry"
+  storage_account_id    = azurerm_storage_account.blobs.id
+  container_access_type = "private"
+}
+
+resource "azurerm_role_assignment" "blob_app" {
+  scope                = azurerm_storage_account.blobs.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.app.principal_id
+}
+
 resource "azurerm_postgresql_flexible_server" "db" {
   name                          = "psql-${local.prefix}"
   location                      = var.location
@@ -113,6 +138,23 @@ resource "azurerm_key_vault_secret" "db_connection" {
   depends_on = [azurerm_role_assignment.kv_deployer]
 }
 
+# Secret du client Entra ID : fourni par TF_VAR_oidc_client_secret (secret d'environnement GitHub), lu par l'application dans le coffre.
+resource "azurerm_key_vault_secret" "oidc_client_secret" {
+  count        = var.auth_mode == "oidc" ? 1 : 0
+  name         = "oidc-client-secret"
+  key_vault_id = azurerm_key_vault.vault.id
+  value        = var.oidc_client_secret
+
+  lifecycle {
+    precondition {
+      condition     = var.oidc_client_secret != "" && var.oidc_tenant_id != "" && var.oidc_client_id != ""
+      error_message = "auth_mode = oidc exige oidc_tenant_id, oidc_client_id (tfvars) et oidc_client_secret (TF_VAR_oidc_client_secret)."
+    }
+  }
+
+  depends_on = [azurerm_role_assignment.kv_deployer]
+}
+
 resource "azurerm_container_app_environment" "env" {
   name                       = "cae-${local.prefix}"
   location                   = var.location
@@ -138,12 +180,6 @@ resource "azurerm_container_app" "web" {
     identity = azurerm_user_assigned_identity.app.id
   }
 
-  secret {
-    name                = "db-connection"
-    key_vault_secret_id = azurerm_key_vault_secret.db_connection.versionless_id
-    identity            = azurerm_user_assigned_identity.app.id
-  }
-
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -165,9 +201,10 @@ resource "azurerm_container_app" "web" {
       cpu    = 0.5
       memory = "1Gi"
 
+      # Les secrets (db-connection, oidc-client-secret) sont lus dans le coffre par l'application, avec son identité managée.
       env {
-        name        = "MYREGISTRY_DB_CONNECTION"
-        secret_name = "db-connection"
+        name  = "MYREGISTRY_KEYVAULT_URI"
+        value = azurerm_key_vault.vault.vault_uri
       }
       env {
         name  = "MYREGISTRY_PUBLIC_URL"
@@ -178,8 +215,29 @@ resource "azurerm_container_app" "web" {
         value = var.auth_mode
       }
       env {
-        name  = "MYREGISTRY_STORAGE"
-        value = "local"
+        name  = "MYREGISTRY_BLOB_ACCOUNT_URL"
+        value = azurerm_storage_account.blobs.primary_blob_endpoint
+      }
+      env {
+        name  = "MYREGISTRY_BLOB_CONTAINER"
+        value = azurerm_storage_container.app.name
+      }
+      env {
+        # Sélectionne la bonne identité managée pour DefaultAzureCredential (une seule identité utilisateur ici).
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.app.client_id
+      }
+      dynamic "env" {
+        for_each = var.auth_mode == "oidc" ? {
+          MYREGISTRY_OIDC_TENANT          = var.oidc_tenant_id
+          MYREGISTRY_OIDC_CLIENT_ID       = var.oidc_client_id
+          MYREGISTRY_BOOTSTRAP_ADMINS     = var.bootstrap_admins
+          MYREGISTRY_OIDC_ALLOWED_DOMAINS = var.oidc_allowed_domains
+        } : {}
+        content {
+          name  = env.key
+          value = env.value
+        }
       }
 
       liveness_probe {
@@ -201,5 +259,19 @@ resource "azurerm_container_app" "web" {
     }
   }
 
-  depends_on = [azurerm_role_assignment.acr_pull, azurerm_role_assignment.kv_app]
+  depends_on = [azurerm_role_assignment.acr_pull, azurerm_role_assignment.kv_app, azurerm_role_assignment.blob_app, azurerm_key_vault_secret.oidc_client_secret]
+}
+
+# Blazor Server garde l'état dans le circuit : toutes les requêtes d'une session doivent atteindre le même réplica.
+# Le fournisseur azurerm n'expose pas l'affinité de session ; on la pose via l'API ARM, et on la repose après chaque modification de l'application.
+resource "azapi_update_resource" "sticky_sessions" {
+  type        = "Microsoft.App/containerApps@2024-03-01"
+  resource_id = azurerm_container_app.web.id
+  body = {
+    properties = { configuration = { ingress = { stickySessions = { affinity = "sticky" } } } }
+  }
+
+  lifecycle {
+    replace_triggered_by = [azurerm_container_app.web]
+  }
 }

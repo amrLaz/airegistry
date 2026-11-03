@@ -81,3 +81,43 @@ variable "keyvault_purge_protection" {
   type        = bool
   default     = false
 }
+
+variable "storage_account_name" {
+  description = "Compte de stockage des objets. Nom unique au monde : 3 à 24 caractères, minuscules et chiffres."
+  type        = string
+  validation {
+    condition     = can(regex("^[a-z0-9]{3,24}$", var.storage_account_name))
+    error_message = "storage_account_name : 3 à 24 caractères, minuscules et chiffres uniquement."
+  }
+}
+
+variable "oidc_tenant_id" {
+  description = "Identifiant du tenant Entra ID (obligatoire si auth_mode = oidc)."
+  type        = string
+  default     = ""
+}
+
+variable "oidc_client_id" {
+  description = "Identifiant de l'inscription d'application Entra ID (obligatoire si auth_mode = oidc)."
+  type        = string
+  default     = ""
+}
+
+variable "oidc_client_secret" {
+  description = "Secret client Entra ID. Fourni par TF_VAR_oidc_client_secret (secret d'environnement GitHub), jamais dans un fichier."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "bootstrap_admins" {
+  description = "Courriels des administrateurs créés au premier login (séparés par des virgules)."
+  type        = string
+  default     = ""
+}
+
+variable "oidc_allowed_domains" {
+  description = "Domaines de messagerie autorisés (séparés par des virgules) ; vide = tous."
+  type        = string
+  default     = ""
+}
