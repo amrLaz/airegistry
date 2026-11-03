@@ -26,6 +26,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScanBaseline> Baselines => Set<ScanBaseline>();
     public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -78,6 +80,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Name).HasMaxLength(40);
         });
 
+        b.Entity<Notification>(e =>
+        {
+            e.ToTable("notifications");
+            e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            e.Property(x => x.UserId).HasMaxLength(200);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Subject).HasMaxLength(200);
+            e.Property(x => x.Detail).HasMaxLength(500);
+            e.Property(x => x.Link).HasMaxLength(300);
+        });
+        b.Entity<NotificationPreference>(e =>
+        {
+            e.ToTable("notification_preferences");
+            e.HasKey(x => new { x.UserId, x.Kind });
+            e.Property(x => x.UserId).HasMaxLength(200);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+        });
         b.Entity<Vote>(e => { e.ToTable("votes"); e.HasKey(x => new { x.ArtifactId, x.UserId }); });
         b.Entity<Report>().ToTable("reports");
         b.Entity<Comment>().ToTable("comments");

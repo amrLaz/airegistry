@@ -59,6 +59,7 @@ builder.Services.AddScoped<Localizer>();
 builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<CommunityService>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 
@@ -104,6 +105,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
 
 app.MapApi();
 app.MapAdminApi();
+app.MapNotificationApi();
 app.MapPluginApi();
 app.MapFeedApi();
 app.MapSecurityApi();

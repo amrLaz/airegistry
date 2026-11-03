@@ -1,0 +1,88 @@
+@page "/notifications"
+@inject NotificationService Svc
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@L["notif_title"] · MyRegistry</PageTitle>
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800">@L["notif_title"]</MudText>
+
+    <MudStack Row Wrap="Wrap.Wrap" Spacing="2" AlignItems="AlignItems.Center">
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="MarkAll">@L["notif_mark_all"]</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ArchiveAll">@L["notif_archive_all"]</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Error" OnClick="DeleteAll">@(_confirm ? L["notif_confirm_delete"] : L["notif_delete_all"])</MudButton>
+        <MudSwitch T="bool" Value="_archived" ValueChanged="ToggleArchived" Label="@L["notif_show_archived"]" Color="Color.Primary" />
+    </MudStack>
+
+    @if (_items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">@L["notif_empty"]</MudAlert>
+    }
+    @foreach (var n in _items)
+    {
+        var nn = n;
+        <MudPaper Outlined Class="pa-3">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                <MudIcon Icon="@(nn.Read ? Icons.Material.Outlined.Circle : Icons.Material.Filled.Circle)" Size="Size.Small" Color="@(nn.Read ? Color.Default : Color.Primary)" />
+                <div style="flex:1 1 280px;min-width:0">
+                    <MudLink Href="@nn.Link" Underline="Underline.None" Color="Color.Inherit" OnClick="() => Read(nn)">
+                        <MudText Style="@(nn.Read ? "opacity:.7" : "font-weight:600")">@NotificationText.Compose(nn, L.Lang == "fr")</MudText>
+                    </MudLink>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@nn.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")@(nn.Archived ? " · archivé" : "")</MudText>
+                </div>
+                @if (!nn.Read) { <MudIconButton Icon="@Icons.Material.Filled.Done" Size="Size.Small" OnClick="() => Read(nn)" aria-label="@L["notif_read"]" /> }
+                @if (!nn.Archived) { <MudIconButton Icon="@Icons.Material.Filled.Archive" Size="Size.Small" OnClick="() => Archive(nn)" aria-label="@L["notif_archive"]" /> }
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => Remove(nn)" aria-label="@L["delete"]" />
+            </MudStack>
+        </MudPaper>
+    }
+
+    <MudPaper Outlined Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-1">@L["notif_prefs"]</MudText>
+        @foreach (var (kind, on) in _prefs)
+        {
+            var k = kind;
+            <div><MudSwitch T="bool" Value="on" ValueChanged="v => SetPref(k, v)" Label="@NotificationText.KindLabel(k, L.Lang == "fr")" Color="Color.Primary" /></div>
+        }
+    </MudPaper>
+</MudStack>
+
+@code {
+    private IReadOnlyList<NotificationDto> _items = [];
+    private IReadOnlyDictionary<NotificationKind, bool> _prefs = new Dictionary<NotificationKind, bool>();
+    private bool _archived, _confirm;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _items = await Svc.ListAsync(_user.Email, _archived, 100);
+        _prefs = await Svc.PreferencesAsync(_user.Email);
+    }
+
+    private async Task Read(NotificationDto n) { await Svc.MarkReadAsync(_user.Email, n.Id); await Reload(); }
+    private async Task Archive(NotificationDto n) { await Svc.ArchiveAsync(_user.Email, n.Id); await Reload(); }
+    private async Task Remove(NotificationDto n) { await Svc.DeleteAsync(_user.Email, n.Id); await Reload(); }
+    private async Task MarkAll() { await Svc.MarkAllReadAsync(_user.Email); await Reload(); }
+    private async Task ArchiveAll() { await Svc.ArchiveAllAsync(_user.Email); await Reload(); }
+    private async Task DeleteAll()
+    {
+        if (!_confirm) { _confirm = true; return; }
+        _confirm = false;
+        await Svc.DeleteAllAsync(_user.Email);
+        await Reload();
+    }
+    private async Task ToggleArchived(bool v) { _archived = v; await Reload(); }
+    private async Task SetPref(NotificationKind k, bool v) => _prefs = await Svc.SetPreferencesAsync(_user.Email, new Dictionary<NotificationKind, bool> { [k] = v });
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

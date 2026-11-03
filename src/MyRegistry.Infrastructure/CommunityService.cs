@@ -8,7 +8,7 @@ public sealed record CommentDto(Guid Id, string UserId, string Body, DateTime At
 public sealed record ReportResult(bool Accepted, bool Quarantined);
 public sealed record MyPublication(Guid Id, string Namespace, string Name, ArtifactType Type, string Version, VersionStatus Status, bool Quarantined, DateTime CreatedAt);
 
-public class CommunityService(AppDbContext db, MarketplaceCache marketplace)
+public class CommunityService(AppDbContext db, MarketplaceCache marketplace, NotificationService notifications)
 {
     public async Task<ReportResult?> ReportAsync(Guid versionId, ReportReason reason, string? details, string userId, CancellationToken ct = default)
     {
@@ -17,6 +17,9 @@ public class CommunityService(AppDbContext db, MarketplaceCache marketplace)
 
         var now = DateTime.UtcNow;
         db.Reports.Add(new Report { VersionId = versionId, UserId = userId, Reason = reason.ToString(), Details = details, At = now });
+        var family = await db.Artifacts.AsNoTracking().FirstAsync(a => a.Id == v.ArtifactId, ct);
+        await notifications.AddAsync(await notifications.EmailsWithRoleAtLeastAsync(Role.Moderator, ct), userId, NotificationKind.ReportFiled,
+            NotificationRules.Subject(family.Namespace, family.Name, v.Version), reason.ToString(), NotificationRules.ArtifactLink(versionId), ct);
         await db.SaveChangesAsync(ct);
 
         var times = (await db.Reports.Where(r => r.VersionId == versionId).Select(r => new { r.UserId, r.At }).ToListAsync(ct)).Select(r => (r.UserId, r.At)).ToList();
@@ -51,10 +54,14 @@ public class CommunityService(AppDbContext db, MarketplaceCache marketplace)
 
     public async Task<CommentDto?> AddCommentAsync(Guid versionId, string userId, string body, CancellationToken ct = default)
     {
-        var artifactId = await db.Versions.Where(v => v.Id == versionId).Select(v => (Guid?)v.ArtifactId).FirstOrDefaultAsync(ct);
-        if (artifactId is null || string.IsNullOrWhiteSpace(body)) return null;
-        var c = new Comment { ArtifactId = artifactId.Value, UserId = userId, Body = body.Trim()[..Math.Min(body.Trim().Length, 2000)] };
+        var target = await db.Versions.AsNoTracking().Include(v => v.Artifact).FirstOrDefaultAsync(v => v.Id == versionId, ct);
+        if (target is null || string.IsNullOrWhiteSpace(body)) return null;
+        var artifactId = target.ArtifactId;
+        var c = new Comment { ArtifactId = artifactId, UserId = userId, Body = body.Trim()[..Math.Min(body.Trim().Length, 2000)] };
         db.Comments.Add(c);
+        var owners = await db.Versions.AsNoTracking().Where(v => v.ArtifactId == artifactId).Select(v => v.CreatedBy).Distinct().ToListAsync(ct);
+        await notifications.AddAsync(owners, userId, NotificationKind.CommentAdded,
+            NotificationRules.Subject(target.Artifact.Namespace, target.Artifact.Name, target.Version), null, NotificationRules.ArtifactLink(versionId), ct);
         await db.SaveChangesAsync(ct);
         return new(c.Id, c.UserId, c.Body, c.At);
     }
