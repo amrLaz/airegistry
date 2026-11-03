@@ -176,3 +176,6 @@
 - Suppression : l'auteur ou un modérateur (et plus) ; `DELETE /api/catalog/{id}/comments/{commentId}` (403 sinon, 404 si inconnu). Les signalements du commentaire sont supprimés avec lui.
 - Signalement : `POST …/comments/{commentId}/report`, un signalant ne compte qu'une fois, on ne signale pas son propre commentaire (400). À 3 signalants distincts, le commentaire est masqué (`Hidden`) et l'événement est audité (`comment-hide`).
 - Entité `comment_reports` (migration `CommentReports`). Le vote (upvote) et les commentaires existaient déjà côté API et interface.
+
+## Modération des commentaires
+- Suppression : l'auteur ou un Moderator+ (`DELETE /api/catalog/{id}/comments/{commentId}`, audité). Signalement : `POST …/report`, un signalant ne compte qu'une fois, on ne signale pas son propre commentaire ; ≥ 3 signalants distincts → commentaire masqué (`Hidden`) en attendant la modération. Table `comment_reports` (migration `CommentReports`).
