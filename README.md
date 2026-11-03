@@ -48,6 +48,10 @@ export MYREGISTRY_OIDC_ALLOWED_DOMAINS=exemple.com       # facultatif : restrein
 ```
 Dans l'inscription d'application Entra ID : type **Web**, URI de redirection `https://<votre-url>/signin-oidc`, URI de déconnexion `https://<votre-url>/signout-callback-oidc`. Les rôles restent gérés en base (page Utilisateurs) : le jeton ne donne jamais de droits. L'application refuse de démarrer si la configuration est incomplète.
 
+## Secrets et stockage (production)
+- **Key Vault** : `MYREGISTRY_KEYVAULT_URI=https://<coffre>.vault.azure.net/` (identité managée ou `az login` en local). Un secret `oidc-client-secret` devient `OIDC_CLIENT_SECRET`, `db-connection` devient `DB_CONNECTION`, etc. (les noms de secrets n'acceptent pas le souligné ; les tirets sont convertis). Le coffre est lu au démarrage et **prime** sur les variables d'environnement ; s'il est injoignable l'application ne démarre pas.
+- **Stockage d'objets** : `MYREGISTRY_BLOB_ACCOUNT_URL=https://<compte>.blob.core.windows.net` (identité managée, rôle *Storage Blob Data Contributor*) ou `MYREGISTRY_BLOB_CONNECTION_STRING` (émulateur Azurite), conteneur `MYREGISTRY_BLOB_CONTAINER` (défaut `myregistry`). Sans configuration : dossier local `local-blobs/` (développement uniquement, ignoré par git).
+
 ## Avec PostgreSQL (plus tard)
 ```bash
 docker compose up -d db
