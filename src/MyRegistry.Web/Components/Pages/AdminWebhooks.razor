@@ -1,0 +1,144 @@
+@page "/admin/webhooks"
+@inject WebhookService Svc
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["webhooks"] · MyRegistry</PageTitle>
+<MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-2">@L["webhooks"]</MudText>
+<AdminNav Current="/admin/webhooks" />
+
+@if (_user.Role < Role.Admin)
+{
+    <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+}
+else
+{
+    <MudText Color="Color.Secondary" Class="mb-3">@L["wh_intro"]</MudText>
+
+    <MudPaper Outlined Class="pa-4 mb-3">
+        <MudText Typo="Typo.h6" Class="mb-2">@L["wh_new"]</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="4"><MudTextField @bind-Value="_name" Label="@L["name"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string" @bind-Value="_format" Label="@L["wh_format"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("teams")">Teams</MudSelectItem>
+                    <MudSelectItem Value="@("json")">JSON (signé)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="5"><MudTextField @bind-Value="_url" Label="@L["wh_url"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12">
+                <MudText Typo="Typo.caption">@L["wh_events"]</MudText>
+                <MudStack Row Wrap="Wrap.Wrap">
+                    @foreach (var ev in WebhookEvents.All)
+                    {
+                        var e = ev;
+                        <MudCheckBox T="bool" Value="_events.Contains(e)" ValueChanged="v => Toggle(e, v)" Label="@e" Color="Color.Primary" />
+                    }
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+        @foreach (var e in _errors) { <MudAlert Severity="Severity.Error" Dense Class="mt-2"><code>@e.Code</code> @e.Message</MudAlert> }
+        @if (_shownSecret is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mt-2">@L["wh_secret_once"]</MudAlert>
+            <MudTextField Value="_shownSecret" ReadOnly Variant="Variant.Outlined" Margin="Margin.Dense" Style="font-family:monospace" />
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="Create">@L["wh_create"]</MudButton>
+    </MudPaper>
+
+    @if (_items.Count == 0) { <MudText Color="Color.Secondary">@L["wh_none"]</MudText> }
+    @foreach (var w in _items)
+    {
+        var ww = w;
+        <MudPaper Outlined Class="pa-3 mb-2">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Spacing="2">
+                <div style="min-width:0">
+                    <b>@ww.Name</b>
+                    <MudChip T="string" Size="Size.Small">@ww.Format</MudChip>
+                    @if (!ww.Active) { <MudChip T="string" Size="Size.Small" Color="Color.Warning">off</MudChip> }
+                    @if (ww.Pending > 0) { <MudChip T="string" Size="Size.Small" Color="Color.Info">@ww.Pending @L["wh_pending"]</MudChip> }
+                    @if (ww.Failed > 0) { <MudChip T="string" Size="Size.Small" Color="Color.Error">@ww.Failed @L["wh_failed"]</MudChip> }
+                    <MudText Typo="Typo.caption" Style="display:block;overflow-wrap:anywhere">@ww.MaskedUrl · @string.Join(", ", ww.Events)</MudText>
+                </div>
+                <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => Test(ww)">@L["wh_test"]</MudButton>
+                    @if (ww.Signed) { <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => Rotate(ww)">@L["wh_rotate"]</MudButton> }
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => Active(ww, !ww.Active)">@(ww.Active ? L["wh_disable"] : L["wh_enable"])</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="() => Delete(ww)">@(_confirm == ww.Id ? L["feed_delete_confirm"] : L["delete"])</MudButton>
+                </MudStack>
+            </MudStack>
+            <MudExpansionPanels Class="mt-1" Elevation="0">
+                <MudExpansionPanel Text="@L["wh_deliveries"]" ExpandedChanged="_ => LoadDeliveries(ww.Id)">
+                    @if (_deliveries.TryGetValue(ww.Id, out var ds))
+                    {
+                        @foreach (var d in ds)
+                        {
+                            <MudText Typo="Typo.caption" Style="font-family:monospace;display:block">
+                                @d.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm") · @d.Event · @d.Status · ×@d.Attempts@(d.LastStatusCode is { } c ? $" · HTTP {c}" : "")@(d.LastError is { } er ? $" · {er}" : "")
+                            </MudText>
+                        }
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudPaper>
+    }
+}
+
+@code {
+    private IReadOnlyList<WebhookDto> _items = [];
+    private Dictionary<Guid, IReadOnlyList<DeliveryDto>> _deliveries = new();
+    private string _name = "", _url = "", _format = "teams";
+    private HashSet<string> _events = ["new_submission"];
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _errors = [];
+    private string? _shownSecret;
+    private Guid? _confirm;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Admin) _items = await Svc.ListAsync();
+    }
+
+    private void Toggle(string e, bool on) { if (on) _events.Add(e); else _events.Remove(e); }
+
+    private async Task Create()
+    {
+        _shownSecret = null;
+        var r = await Svc.CreateAsync(new WebhookInput(_name, _format, _url, _events.ToList(), null), _user.Email);
+        _errors = r.Errors;
+        if (r.Errors.Count > 0) return;
+        _shownSecret = r.Secret; _name = ""; _url = "";
+        _items = await Svc.ListAsync();
+    }
+
+    private async Task Test(WebhookDto w)
+    {
+        var d = await Svc.TestAsync(w.Id, _user.Email);
+        Snack.Add(d is null ? "?" : d.Status == "Delivered" ? $"OK (HTTP {d.LastStatusCode})" : $"{d.Status} : {d.LastError}", d?.Status == "Delivered" ? Severity.Success : Severity.Error);
+        await LoadDeliveries(w.Id);
+    }
+
+    private async Task Rotate(WebhookDto w) => _shownSecret = await Svc.RotateSecretAsync(w.Id, _user.Email);
+
+    private async Task Active(WebhookDto w, bool on)
+    {
+        await Svc.SetActiveAsync(w.Id, on, _user.Email);
+        _items = await Svc.ListAsync();
+    }
+
+    private async Task Delete(WebhookDto w)
+    {
+        if (_confirm != w.Id) { _confirm = w.Id; return; }
+        _confirm = null;
+        await Svc.DeleteAsync(w.Id, _user.Email);
+        _items = await Svc.ListAsync();
+    }
+
+    private async Task LoadDeliveries(Guid id) => _deliveries[id] = await Svc.DeliveriesAsync(id) ?? [];
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}
