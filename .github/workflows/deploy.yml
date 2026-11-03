@@ -1,6 +1,6 @@
-# GitOps : l'état déployé est celui décrit dans Git.
+# GitOps : l'état déployé est celui décrit dans Git (Terraform, infra/terraform).
 #  - develop -> environnement dev : image construite depuis le commit, déploiement automatique.
-#  - main    -> environnement prod : déploie le tag ÉPINGLÉ dans infra/params/prod.bicepparam (promotion par PR).
+#  - main    -> environnement prod : déploie le tag ÉPINGLÉ dans infra/terraform/envs/prod.tfvars (promotion par PR).
 name: Deploy
 on:
   push:
@@ -15,6 +15,16 @@ permissions:
 concurrency:
   group: deploy-${{ github.ref_name }}
   cancel-in-progress: false
+
+env:
+  # Authentification du fournisseur Terraform par OIDC (identité fédérée créée par infra/bootstrap.sh).
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  TF_VAR_db_admin_password: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+  TF_VAR_oidc_client_secret: ${{ secrets.MYREGISTRY_OIDC_CLIENT_SECRET }}
 
 jobs:
   test:
@@ -38,7 +48,7 @@ jobs:
       - id: meta
         run: |
           echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "acr=$(grep -oP "param acrName = '\K[^']+" infra/params/dev.bicepparam)" >> "$GITHUB_OUTPUT"
+          echo "acr=$(grep -oP '^acr_name\s*=\s*"\K[^"]+' infra/terraform/envs/dev.tfvars)" >> "$GITHUB_OUTPUT"
       - name: Build et push (az acr build, sans Docker local)
         run: az acr build --registry "${{ steps.meta.outputs.acr }}" --image "myregistry-web:${{ steps.meta.outputs.tag }}" --file Dockerfile .
 
@@ -47,26 +57,28 @@ jobs:
     needs: build-image
     runs-on: ubuntu-latest
     environment: dev
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/login@v2
+      - uses: hashicorp/setup-terraform@v3
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Déployer l'état décrit dans Git
-        env:
-          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
-        run: |
-          az deployment group create \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --parameters infra/params/dev.bicepparam \
-            --parameters imageTag="${{ needs.build-image.outputs.tag }}"
+          terraform_version: "~> 1.9"
+      - name: Init (état distant de dev)
+        run: terraform init -input=false -backend-config=envs/dev.backend.hcl
+      - name: Plan
+        run: terraform plan -input=false -var-file=envs/dev.tfvars -var "image_tag=${{ needs.build-image.outputs.tag }}" -out=tfplan
+      - name: Appliquer l'état décrit dans Git
+        run: terraform apply -input=false tfplan
 
   deploy-prod:
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     environment: prod   # approbation manuelle configurée sur l'environnement GitHub
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
       - uses: azure/login@v2
@@ -76,13 +88,15 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Vérifier que l'image épinglée existe
         run: |
-          acr=$(grep -oP "param acrName = '\K[^']+" infra/params/prod.bicepparam)
-          tag=$(grep -oP "param imageTag = '\K[^']+" infra/params/prod.bicepparam)
+          acr=$(grep -oP '^acr_name\s*=\s*"\K[^"]+' envs/prod.tfvars)
+          tag=$(grep -oP '^image_tag\s*=\s*"\K[^"]+' envs/prod.tfvars)
           az acr repository show --name "$acr" --image "myregistry-web:$tag" > /dev/null
-      - name: Déployer l'état décrit dans Git
-        env:
-          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
-        run: |
-          az deployment group create \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --parameters infra/params/prod.bicepparam
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+      - name: Init (état distant de prod)
+        run: terraform init -input=false -backend-config=envs/prod.backend.hcl
+      - name: Plan
+        run: terraform plan -input=false -var-file=envs/prod.tfvars -out=tfplan
+      - name: Appliquer l'état décrit dans Git
+        run: terraform apply -input=false tfplan

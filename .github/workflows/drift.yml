@@ -1,4 +1,5 @@
 # Détection de dérive : si l'état réel diffère de Git (changement manuel dans le portail), le job échoue.
+# `terraform plan -detailed-exitcode` : 0 = conforme, 2 = écart, 1 = erreur.
 name: Drift detection
 on:
   schedule:
@@ -9,6 +10,15 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  TF_VAR_db_admin_password: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+  TF_VAR_oidc_client_secret: ${{ secrets.MYREGISTRY_OIDC_CLIENT_SECRET }}
+
 jobs:
   drift:
     strategy:
@@ -17,6 +27,9 @@ jobs:
         env: [dev, prod]
     runs-on: ubuntu-latest
     environment: ${{ matrix.env }}
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,17 +39,23 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: What-if et comptage des écarts
-        env:
-          MYREGISTRY_DB_ADMIN_PASSWORD: ${{ secrets.MYREGISTRY_DB_ADMIN_PASSWORD }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+      - name: Init
+        run: terraform init -input=false -backend-config="envs/${{ matrix.env }}.backend.hcl"
+      - name: Plan et détection des écarts
         run: |
-          az deployment group what-if \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --parameters "infra/params/${{ matrix.env }}.bicepparam" \
-            --no-pretty-print -o json > whatif.json
-          n=$(jq '[.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore")] | length' whatif.json)
-          echo "Écarts détectés : $n"
-          if [ "$n" -gt 0 ]; then
-            jq -r '.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore") | "\(.changeType) \(.resourceId)"' whatif.json
-            exit 1
+          args=(-input=false -lock=false -no-color -detailed-exitcode -var-file="envs/${{ matrix.env }}.tfvars")
+          if [ "${{ matrix.env }}" = "dev" ]; then
+            # Dev : le tag est celui du dernier déploiement (SHA), pas la valeur de repli du fichier.
+            image=$(az containerapp show -n "ca-myregistry-dev-web" -g "$(grep -oP '^resource_group_name\s*=\s*"\K[^"]+' envs/dev.tfvars)" --query "properties.template.containers[0].image" -o tsv)
+            args+=(-var "image_tag=${image##*:}")
           fi
+          set +e
+          terraform plan "${args[@]}" | tee plan.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "Code de sortie du plan : $code"
+          if [ "$code" -eq 2 ]; then echo "::error::Dérive détectée : l'état réel diffère de Git."; exit 1; fi
+          exit "$code"

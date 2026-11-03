@@ -55,8 +55,8 @@ Légende : [ ] à faire. Chaque tâche = une tranche verticale avec tests.
 - [ ] Baseline YAML v2, backfill, relance, export CSV, prompt de correction
 
 ## Phase 7 : Cloud (2 sem.)
-- [ ] OIDC Entra ID, secrets Key Vault, `IBlobStore` Azure Blob
-- [ ] IaC (Bicep ou Terraform), ACR, ACA, PostgreSQL Flexible Server, domaine
+- [x] OIDC Entra ID, secrets Key Vault, `IBlobStore` Azure Blob (testés avec un fournisseur simulé, Azurite ; à valider contre un vrai tenant : voir DECISIONS.md)
+- [x] IaC Terraform : ACR (bootstrap), ACA, PostgreSQL Flexible Server, Key Vault, Blob (validé `validate` uniquement ; jamais appliqué) — domaine personnalisé restant
 - [ ] Pipeline Azure DevOps, révisions ACA
 - [ ] Migration des artefacts existants + réécriture des slugs vers `myregistry/*` avec alias
 

@@ -29,7 +29,7 @@ Je développe seul avec toi. Travaille par tranches verticales (API + UI + tests
 Respecte `CONTRIBUTING.md` via le skill `git-conventions` : branches `feat/`, `fix/`, `docs/`..., commits conventionnels, auteur toujours `amr.lazraq`.
 
 ## Livraison (GitOps)
-Git est la source de vérité : infra dans `infra/` (Bicep), versions déployées dans `infra/params/*.bicepparam`, pipelines dans `.github/workflows/`. Aucune modification manuelle dans Azure ; tout passe par PR. Voir `docs/08-gitops.md`.
+Git est la source de vérité : infra dans `infra/terraform/` (Terraform), versions déployées dans `infra/terraform/envs/*.tfvars`, pipelines dans `.github/workflows/`. Aucune modification manuelle dans Azure ; tout passe par PR. Voir `docs/08-gitops.md`.
 
 ## Conventions de code
 - Architecture en couches : Domain / Application / Infrastructure / Web. Pas de logique métier dans les contrôleurs ni les composants Blazor.
