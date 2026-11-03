@@ -106,6 +106,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
 app.MapApi();
 app.MapAdminApi();
 app.MapNotificationApi();
+app.MapNpmApi();
 app.MapPluginApi();
 app.MapFeedApi();
 app.MapSecurityApi();
