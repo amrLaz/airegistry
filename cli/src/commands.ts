@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { Api } from './api.js';
+import { browserLogin, defaultIo, type Io } from './auth.js';
 import { configPath, resolveConfig, writeConfig, type Config } from './config.js';
 import { applyPlan, detectAgent, planInstall, removeInstalled } from './install.js';
 import { readLock, writeLock, lockPath, type LockEntry } from './lock.js';
@@ -14,6 +16,7 @@ export interface Ctx {
   home: string;
   config: Config;
   api: Api;
+  io?: Io;
   out: (s: string) => void;
   err: (s: string) => void;
 }
@@ -212,7 +215,62 @@ export async function cmdCheck(ctx: Ctx, target: string | undefined, o: Opts): P
   return blocking === 0 ? 0 : 1;
 }
 
+/** Obtient un jeton par le navigateur si le serveur ne reconnaît pas l'utilisateur ; sans effet avec MYREGISTRY_API_TOKEN ou un serveur qui n'expose pas /api/me. */
+export async function ensureAuth(ctx: Ctx): Promise<void> {
+  if (ctx.api.token) return;
+  const me = await ctx.api.me();
+  if (me === undefined || me.authenticated) return;
+  ctx.api.token = await browserLogin(ctx.config.baseUrl, ctx.io ?? defaultIo, ctx.out);
+}
+
+export async function cmdLogin(ctx: Ctx): Promise<number> {
+  const token = ctx.api.token ?? await browserLogin(ctx.config.baseUrl, ctx.io ?? defaultIo, ctx.out);
+  ctx.api.token = token;
+  const me = await ctx.api.me();
+  if (!me?.authenticated) throw new CliError('Connexion refusée par le registre.');
+  ctx.out(`Connecté en tant que ${me.email} (${me.role}). Le jeton reste en mémoire et expire au bout d'une minute ; publish et edit relancent la connexion si besoin.`);
+  return 0;
+}
+
+export async function cmdEdit(ctx: Ctx, ref: string | undefined, o: Opts): Promise<number> {
+  if (!ref) throw new CliError('Usage : myregistry edit <namespace/nom> [--version V] [--editor CMD] [--resume]');
+  const slug = parseSlug(ref);
+  if (!slug) throw new CliError('Référence invalide : attendu <namespace>/<nom>.');
+  await ensureAuth(ctx);
+  const dir = path.join(os.tmpdir(), 'myregistry-edit', `${slug.ns}-${slug.name}`);
+  const marker = path.join(dir, '.myregistry-edit.json');
+  let meta: { namespace: string; name: string; type: ArtifactType; description?: string; tags: string[]; base: string };
+
+  if (o.resume && fs.existsSync(marker)) {
+    meta = JSON.parse(fs.readFileSync(marker, 'utf8'));
+    ctx.out(`Reprise de l'édition dans ${dir}`);
+  } else {
+    const src = await ctx.api.editSource(slug.ns, slug.name, str(o, 'version'));
+    fs.rmSync(dir, { recursive: true, force: true });
+    for (const f of src.files) {
+      const target = path.join(dir, f.path);
+      if (!path.resolve(target).startsWith(path.resolve(dir) + path.sep)) throw new CliError(`Chemin refusé : ${f.path}`);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, Buffer.from(f.content, 'base64'));
+    }
+    meta = { namespace: src.namespace, name: src.name, type: src.type, description: src.description, tags: src.tags, base: src.version };
+    fs.writeFileSync(marker, JSON.stringify(meta));
+    ctx.out(`Sources de ${src.namespace}/${src.name}@${src.version} (${src.status}) dans ${dir}`);
+  }
+
+  await (ctx.io ?? defaultIo).edit(dir, str(o, 'editor'));
+  fs.rmSync(marker, { force: true });
+  const code = await cmdPublish(ctx, dir, {
+    ...o, namespace: meta.namespace, name: meta.name, type: meta.type, version: str(o, 'new-version'),
+    description: str(o, 'description') ?? meta.description, tags: str(o, 'tags') ?? meta.tags.join(','),
+  });
+  if (code === 0) fs.rmSync(dir, { recursive: true, force: true });
+  else fs.writeFileSync(marker, JSON.stringify(meta)); // permet --resume après une erreur de validation
+  return code;
+}
+
 export async function cmdPublish(ctx: Ctx, target: string | undefined, o: Opts): Promise<number> {
+  await ensureAuth(ctx);
   const src = path.resolve(ctx.cwd, target ?? '.');
   const files = readArtifact(src);
   const type = asType(str(o, 'type') ?? str(o, 't')) ?? detectType(Object.keys(files));
@@ -280,7 +338,7 @@ export async function cmdAddRegistry(ctx: Ctx, o: Opts): Promise<number> {
   return skipped > 0 ? 1 : 0;
 }
 
-export function buildCtx(base: { cwd: string; home: string; env?: NodeJS.ProcessEnv }, out: (s: string) => void, err: (s: string) => void, fetchImpl?: typeof fetch): Ctx {
+export function buildCtx(base: { cwd: string; home: string; env?: NodeJS.ProcessEnv }, out: (s: string) => void, err: (s: string) => void, fetchImpl?: typeof fetch, io?: Io): Ctx {
   const config = resolveConfig({ env: base.env, cwd: base.cwd, home: base.home });
-  return { cwd: base.cwd, home: base.home, config, api: new Api(config.baseUrl, config.apiToken, fetchImpl), out, err };
+  return { cwd: base.cwd, home: base.home, config, api: new Api(config.baseUrl, config.apiToken, fetchImpl), io, out, err };
 }

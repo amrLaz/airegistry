@@ -20,13 +20,15 @@ Usage : myregistry <commande> [options]
   pack [chemin] [--type T --name N --output F]
   check [chemin] [--namespace NS --name N --type T]
   publish [chemin] [--dry-run] [--name N] [--namespace NS] [--version V] [--description D] [--tags a,b] [--type T]
+  login                                          ouvre le navigateur ; jeton 1 min, jamais écrit sur disque
+  edit <namespace/nom> [--version V] [--editor CMD] [--resume] [--new-version V]   nouvelle version à partir des sources
   add-registry [--apply] [--marketplace URL] [-g]   configure le marketplace (VS Code, Claude Code)
   version | help
 
 Variables : MYREGISTRY_BASE_URL, MYREGISTRY_API_TOKEN
-Non implémenté pour l'instant : login, edit, completion.`;
+Non implémenté pour l'instant : completion.`;
 
-export async function main(argv: string[], deps?: { cwd?: string; home?: string; env?: NodeJS.ProcessEnv; out?: (s: string) => void; err?: (s: string) => void; fetch?: typeof fetch }): Promise<number> {
+export async function main(argv: string[], deps?: { cwd?: string; home?: string; env?: NodeJS.ProcessEnv; out?: (s: string) => void; err?: (s: string) => void; fetch?: typeof fetch; io?: import('./auth.js').Io }): Promise<number> {
   const out = deps?.out ?? ((s: string) => console.log(s));
   const err = deps?.err ?? ((s: string) => console.error(s));
   const [cmd, ...rest] = argv;
@@ -41,11 +43,11 @@ export async function main(argv: string[], deps?: { cwd?: string; home?: string;
         search: { type: 'string' }, tag: { type: 'string' }, page: { type: 'string' }, 'page-size': { type: 'string' },
         version: { type: 'string', short: 'v' }, name: { type: 'string', short: 'n' }, namespace: { type: 'string' },
         description: { type: 'string', short: 'd' }, tags: { type: 'string' }, output: { type: 'string', short: 'o' },
-        'registry-base-url': { type: 'string' }, apply: { type: 'boolean' }, marketplace: { type: 'string' },
+        'registry-base-url': { type: 'string' }, editor: { type: 'string' }, resume: { type: 'boolean' }, 'new-version': { type: 'string' }, apply: { type: 'boolean' }, marketplace: { type: 'string' },
       },
     });
     const o = values as c.Opts;
-    const ctx = c.buildCtx({ cwd: deps?.cwd ?? process.cwd(), home: deps?.home ?? os.homedir(), env: deps?.env }, out, err, deps?.fetch);
+    const ctx = c.buildCtx({ cwd: deps?.cwd ?? process.cwd(), home: deps?.home ?? os.homedir(), env: deps?.env }, out, err, deps?.fetch, deps?.io);
     switch (cmd) {
       case undefined: case 'help': case '--help': out(HELP); return 0;
       case 'version': case '--version': {
@@ -62,7 +64,9 @@ export async function main(argv: string[], deps?: { cwd?: string; home?: string;
       case 'check': return await c.cmdCheck(ctx, positionals[0], o);
       case 'publish': return await c.cmdPublish(ctx, positionals[0], o);
       case 'add-registry': return await c.cmdAddRegistry(ctx, o);
-      case 'login': case 'edit': case 'completion':
+      case 'login': return await c.cmdLogin(ctx);
+      case 'edit': return await c.cmdEdit(ctx, positionals[0], o);
+      case 'completion':
         throw new CliError(`« ${cmd} » n'est pas encore implémentée.`);
       default: throw new CliError(`Commande inconnue : ${cmd}. Voir « myregistry help ».`);
     }
