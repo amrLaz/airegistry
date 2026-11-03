@@ -61,7 +61,13 @@ Légende : [ ] à faire. Chaque tâche = une tranche verticale avec tests.
 - [ ] Migration des artefacts existants + réécriture des slugs vers `myregistry/*` avec alias
 
 ## Phase 8 : Optionnel
-Notifications in-app, webhooks Teams, garde-fous de poste, cockpit d'orchestration (définir la grille d'étalonnage avant), serveur MCP, plugin Cursor.
+- [x] Notifications in-app (cloche, page, préférences)
+- [x] Webhooks Teams et JSON signé (reprises, anti-SSRF)
+- [x] Serveur MCP du registre (lecture seule, Streamable HTTP)
+- [x] Cible Cursor (règles, commandes, MCP) — à valider contre l'outil
+- [x] Mesure d'usage par source (socle du cockpit)
+- [ ] Cockpit d'orchestration : **bloqué** — le backlog demande de définir la grille d'étalonnage avant ; elle n'existe pas
+- [ ] Garde-fous de poste : **non commencé** — exigences et comportement du client (hooks) à définir
 
 ## Rétention
-Prévoir une politique de rétention des versions (un plugin auto-publié peut atteindre des centaines de versions).
+Politique de rétention des versions : **faite** (désactivée par défaut, voir DECISIONS.md).

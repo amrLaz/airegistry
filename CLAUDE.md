@@ -55,4 +55,4 @@ Git est la source de vérité : infra dans `infra/terraform/` (Terraform), versi
 5. Termine chaque tranche par : tests verts, OpenAPI à jour, doc mise à jour.
 
 ## Hors périmètre initial
-GitLab, notifications Slack/Teams, garde-fous de poste, cockpit d'orchestration, serveur MCP, plugins Cursor. Voir phase 8.
+GitLab, garde-fous de poste, cockpit d'orchestration. (Notifications, webhooks Teams, serveur MCP et cible Cursor ont été faits en phase 8 ; voir docs/06-backlog.md.)
