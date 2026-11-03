@@ -9,6 +9,10 @@ public static class SettingKeys
     public const string MarketplaceRepo = "marketplace_repo";
     /// <summary>Analyse de sécurité directe à la publication (« true » par défaut).</summary>
     public const string SecurityScanEnabled = "security_scan_enabled";
+    /// <summary>Courriel de contact du registre (affiché dans le marketplace, facultatif).</summary>
+    public const string ContactEmail = "contact_email";
+    /// <summary>Posé par l'assistant de premier lancement ; réglage technique, non modifiable par l'utilisateur.</summary>
+    public const string SetupCompleted = "setup_completed";
     public const string SnapshotDigest = "marketplace_snapshot_digest";
     public const string SnapshotAt = "marketplace_snapshot_at";
     public const string SnapshotCommit = "marketplace_snapshot_commit";

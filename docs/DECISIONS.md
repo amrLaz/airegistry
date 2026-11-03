@@ -191,3 +191,10 @@
 - **Jetons CI** (`MYREGISTRY_API_TOKEN`) : créés depuis `/tokens` ou `POST /api/cli/tokens` (Publisher+), 30 jours par défaut, 90 maximum, valeur affichée une seule fois, révocables. **Création refusée avec un jeton** : un jeton ne peut pas en engendrer d'autres.
 - **`edit <ns/nom>`** : `GET /api/cli/edit/source` (auteur d'une version de la famille ou Admin, tous statuts) → sources dans `<tmp>/myregistry-edit/<ns>-<nom>` → éditeur (`--editor`, `$VISUAL`, `$EDITOR`, sinon `code --wait`) → publication d'une nouvelle version (suggérée par le serveur, ou `--new-version`) sans PR. Après un échec le dossier est conservé : `--resume` reprend sans retélécharger. Chemins sortant du dossier refusés.
 - `GET /auth/login` et `/auth/logout` (SSO) viendront avec Entra ID (phase 7).
+
+## Assistant de premier lancement (`/setup`)
+- **Quand** : l'accueil redirige un Admin vers `/setup` si le réglage `setup_completed` n'est pas « true » **et** qu'aucun artefact n'existe (`SetupRules.NeedsSetup`). Une instance déjà utilisée n'est donc jamais redirigée. L'assistant reste accessible à la main sur `/setup`.
+- **Étapes** : 1 identité (titre, namespace par défaut, courriel de contact, URL publique : validées par les règles de réglages existantes, erreurs affichées par champ) ; 2 dépôt Git **facultatif** (test de connexion, création d'un feed ordinaire ; « Passer » possible) ; 3 authentification (état seul : mode développement ou OIDC ; la configuration Entra ID arrive en phase 7) ; 4 commandes pour brancher le registre à Claude Code et VS Code.
+- **Réglages** : `contact_email` (nouveau, facultatif) ; `setup_completed` est technique et non modifiable via `/api/admin/settings` (rejeté comme « Réglage inconnu »). API : `GET /api/setup/status`, `PUT /api/setup/identity`, `POST /api/setup/complete` (Admin).
+- **Différence assumée avec l'application de référence** : l'étape Git n'est pas bloquante (pas de test de connexion obligatoire avant « Suivant »).
+- Le titre affiché dans la barre du haut se met à jour en direct quand les réglages changent (événement `SettingsCache.Changed`), y compris depuis l'écran de configuration.

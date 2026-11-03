@@ -1,0 +1,153 @@
+@page "/setup"
+@inject SetupService SetupSvc
+@inject FeedService Feeds
+@inject SettingsCache Cache
+@inject Localizer L
+@inject IAuthProvider Auth
+@inject NavigationManager Nav
+@inject IConfiguration Config
+@inject ISnackbar Snack
+@implements IDisposable
+
+<PageTitle>@L["setup_title"] · MyRegistry</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="my-6">
+    <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800" Class="mb-1">@L["setup_title"]</MudText>
+    <MudText Color="Color.Secondary" Class="mb-4">@L["setup_welcome"]</MudText>
+
+    @if (_user.Role < Role.Admin)
+    {
+        <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+    }
+    else
+    {
+        <MudStack Row Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+            @for (var i = 1; i <= 4; i++)
+            {
+                var n = i;
+                <MudChip T="string" Size="Size.Small" Color="@(_step == n ? Color.Primary : Color.Default)" Variant="@(_step == n ? Variant.Filled : Variant.Outlined)">@n · @L[$"setup_step{n}"]</MudChip>
+            }
+        </MudStack>
+
+        <MudPaper Outlined Class="pa-4">
+            @if (_step == 1)
+            {
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_title" Label="@L["config_title"]" Variant="Variant.Outlined" Required />
+                    <MudTextField @bind-Value="_ns" Label="@L["config_ns"]" Variant="Variant.Outlined" HelperText="2–32, a-z 0-9 -" Required />
+                    <MudTextField @bind-Value="_contact" Label="@L["setup_contact"]" Variant="Variant.Outlined" InputType="InputType.Email" />
+                    <MudTextField @bind-Value="_publicUrl" Label="@L["setup_public_url"]" Variant="Variant.Outlined" Placeholder="https://registry.example.com" />
+                </MudStack>
+            }
+            else if (_step == 2)
+            {
+                <MudText Class="mb-3">@L["setup_git_intro"]</MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="FeedKind" @bind-Value="_kind" Label="@L["feed_kind"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var k in Enum.GetValues<FeedKind>()) { <MudSelectItem Value="k">@k</MudSelectItem> }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="8"><MudTextField @bind-Value="_feedName" Label="@L["name"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12"><MudTextField @bind-Value="_feedUrl" Label="@L["feed_url"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="6"><MudTextField @bind-Value="_branch" Label="@L["feed_branch"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="6"><MudTextField @bind-Value="_pat" Label="@L["feed_pat"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                </MudGrid>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" Class="mt-2" OnClick="TestFeed">@L["feed_test"]</MudButton>
+                @if (_feedAdded) { <MudAlert Severity="Severity.Success" Dense Class="mt-2">@L["setup_feed_added"]</MudAlert> }
+            }
+            else if (_step == 3)
+            {
+                @if (_oidc) { <MudAlert Severity="Severity.Success">@L["setup_auth_oidc"]</MudAlert> }
+                else { <MudAlert Severity="Severity.Warning">@L["setup_auth_dev"]</MudAlert> }
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-3">@L["setup_auth_hint"]</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.h6" Class="mb-2">@L["setup_summary"]</MudText>
+                <MudText Typo="Typo.caption">Claude Code</MudText>
+                <MudTextField Value="_claudeCmd" ReadOnly Variant="Variant.Outlined" Margin="Margin.Dense" Style="font-family:monospace" />
+                <MudText Typo="Typo.caption" Class="mt-2">VS Code (settings.json)</MudText>
+                <MudTextField Value="_vscodeCfg" ReadOnly Variant="Variant.Outlined" Margin="Margin.Dense" Style="font-family:monospace" />
+            }
+
+            @foreach (var e in _errors) { <MudAlert Severity="Severity.Error" Dense Class="mt-3"><code>@e.Code</code> @e.Message</MudAlert> }
+
+            <MudStack Row Justify="Justify.SpaceBetween" Class="mt-4">
+                <MudButton Disabled="@(_step == 1)" OnClick="Back">@L["setup_prev"]</MudButton>
+                @if (_step < 4)
+                {
+                    <MudStack Row Spacing="1">
+                        @if (_step == 2) { <MudButton OnClick="Next">@L["setup_skip"]</MudButton> }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Next">@L["setup_next"]</MudButton>
+                    </MudStack>
+                }
+                else { <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Finish">@L["setup_finish"]</MudButton> }
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private int _step = 1;
+    private string _title = "", _ns = "", _contact = "", _publicUrl = "";
+    private FeedKind _kind = FeedKind.GitHub;
+    private string _feedName = "", _feedUrl = "", _branch = "main", _pat = "";
+    private bool _feedAdded, _oidc;
+    private string _claudeCmd = "", _vscodeCfg = "";
+    private IReadOnlyList<MyRegistry.Application.Rules.Issue> _errors = [];
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        _oidc = string.Equals(Config["AUTH_MODE"], "oidc", StringComparison.OrdinalIgnoreCase);
+        if (_user.Role < Role.Admin) return;
+        var s = await SetupSvc.StatusAsync(_user.Role);
+        _title = s.Title; _ns = s.DefaultNamespace; _contact = s.ContactEmail; _publicUrl = s.PublicUrl;
+    }
+
+    private FeedRules.FeedInput FeedInput() => new(_feedName, _kind, _feedUrl, _branch, string.IsNullOrWhiteSpace(_pat) ? null : _pat, null, null);
+
+    private async Task TestFeed()
+    {
+        var (ok, message, head, files) = await Feeds.TestConnectionAsync(FeedInput());
+        Snack.Add(ok ? $"{message} ({head?[..Math.Min(7, head.Length)]}, {files} fichiers)" : message, ok ? Severity.Success : Severity.Error);
+    }
+
+    private async Task Next()
+    {
+        _errors = [];
+        if (_step == 1)
+        {
+            _errors = await SetupSvc.ApplyIdentityAsync(_title, _ns, _contact, _publicUrl, _user.Email);
+            if (_errors.Count > 0) return;
+            Cache.Invalidate();
+        }
+        else if (_step == 2 && !string.IsNullOrWhiteSpace(_feedUrl) && !_feedAdded)
+        {
+            var r = await Feeds.CreateAsync(FeedInput(), false, _user.Email);
+            _errors = r.Errors;
+            if (_errors.Count > 0) return;
+            _feedAdded = true;
+        }
+        if (_step == 3)
+        {
+            var baseUrl = string.IsNullOrWhiteSpace(_publicUrl) ? Nav.BaseUri : _publicUrl;
+            (_claudeCmd, _vscodeCfg) = SetupRules.MarketplaceSnippets(baseUrl);
+        }
+        _step++;
+    }
+
+    private void Back() { _errors = []; _step--; }
+
+    private async Task Finish()
+    {
+        await SetupSvc.CompleteAsync(_user.Email);
+        Nav.NavigateTo("/");
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}

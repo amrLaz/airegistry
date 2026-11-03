@@ -152,6 +152,7 @@
         _user = Auth.GetCurrentUser();
         L.Changed += OnChanged;
         Nav.LocationChanged += OnLocation;
+        Settings.Changed += OnSettingsChanged;
         _title = await Settings.TitleAsync();
         await LoadPending();
         await LoadNotifications();
@@ -191,5 +192,7 @@
         Nav.NavigateTo(string.IsNullOrWhiteSpace(_q) ? "/" : $"/?q={Uri.EscapeDataString(_q.Trim())}");
     }
 
-    public void Dispose() { L.Changed -= OnChanged; Nav.LocationChanged -= OnLocation; }
+    private void OnSettingsChanged() => InvokeAsync(async () => { _title = await Settings.TitleAsync(); StateHasChanged(); });
+
+    public void Dispose() { L.Changed -= OnChanged; Nav.LocationChanged -= OnLocation; Settings.Changed -= OnSettingsChanged; }
 }
