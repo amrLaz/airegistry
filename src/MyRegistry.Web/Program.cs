@@ -82,6 +82,7 @@ builder.Services.AddSingleton(new WebhookOptions(webhookPrivate));
 builder.Services.AddHttpClient(WebhookService.ClientName).ConfigurePrimaryHttpMessageHandler(() => WebhookService.CreateHandler(webhookPrivate));
 builder.Services.AddScoped<WebhookService>();
 builder.Services.AddScoped<CliTokenService>();
+builder.Services.AddScoped<McpServer>();
 builder.Services.AddSingleton<IBlobStore>(_ => BlobStoreFactory.Create(builder.Configuration["BLOB_CONNECTION_STRING"], builder.Configuration["BLOB_ACCOUNT_URL"],
     builder.Configuration["BLOB_CONTAINER"], builder.Configuration["BLOB_PATH"]));
 builder.Services.AddScoped<SetupService>();
@@ -153,6 +154,7 @@ app.MapNpmApi();
 app.MapCliApi();
 app.MapSetupApi();
 app.MapWebhookApi();
+app.MapMcpApi();
 app.MapPluginApi();
 app.MapFeedApi();
 app.MapSecurityApi();

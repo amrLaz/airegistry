@@ -82,7 +82,7 @@ public static class OidcSetup
     public static bool IsPublicPath(PathString path)
     {
         string[] prefixes = ["/api", "/auth", "/signin-oidc", "/signout-callback-oidc", "/health", "/marketplace.json", "/skills", "/scalar", "/openapi",
-            "/_framework", "/_content", "/_blazor", "/cli/auth"];
+            "/_framework", "/_content", "/_blazor", "/cli/auth", "/mcp"];
         return prefixes.Any(p => path.StartsWithSegments(p)) || Path.HasExtension(path.Value);
     }
 }
