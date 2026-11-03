@@ -24,7 +24,7 @@ public static class NpmEndpoints
             if (NpmSurface.VersionFromFile(name, file) is not { } version) return Results.NotFound();
             var v = (await svc.ApprovedVersionsAsync(scope, name, ArtifactType.Skill)).FirstOrDefault(x => x.Version == version);
             if (v is null) return Results.NotFound();
-            await svc.CountDownloadAsync(v.Id);
+            await svc.CountDownloadAsync(v.Id, UsageSources.Npm);
             return Results.File(Tarball(v), "application/octet-stream", file);
         }).WithName("NpmTarball");
     }

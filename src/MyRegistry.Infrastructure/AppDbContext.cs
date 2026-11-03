@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScanBaseline> Baselines => Set<ScanBaseline>();
     public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
+    public DbSet<UsageDaily> UsageDaily => Set<UsageDaily>();
     public DbSet<Webhook> Webhooks => Set<Webhook>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<CliToken> CliTokens => Set<CliToken>();
@@ -104,6 +105,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Vote>(e => { e.ToTable("votes"); e.HasKey(x => new { x.ArtifactId, x.UserId }); });
         b.Entity<Report>().ToTable("reports");
         b.Entity<Comment>().ToTable("comments");
+        b.Entity<UsageDaily>(e =>
+        {
+            e.ToTable("usage_daily");
+            e.HasKey(x => new { x.Day, x.VersionId, x.Source });
+            e.HasIndex(x => x.VersionId);
+            e.Property(x => x.Source).HasMaxLength(10);
+            e.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.VersionId).OnDelete(DeleteBehavior.Cascade);
+        });
         b.Entity<Webhook>(e =>
         {
             e.ToTable("webhooks");

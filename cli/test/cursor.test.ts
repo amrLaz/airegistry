@@ -60,3 +60,10 @@ test('add --agent cursor écrit la règle, le lockfile et affiche l\'avertisseme
   assert.match(err.join('\n'), /AVERT\. 1 fichier\(s\) complémentaire\(s\)/);
   assert.deepEqual(readLock(path.join(cwd, 'myregistry.lock')).artifacts['myregistry/pdf'].files, ['.cursor/rules/pdf.mdc']);
 });
+
+test('la CLI s\'annonce au registre par un User-Agent myregistry-cli/<version>', async () => {
+  const seen: string[] = [];
+  const f = (async (_url: string, init?: RequestInit) => { seen.push((init?.headers as Record<string, string>)['User-Agent']); return new Response(JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20 }), { headers: { 'content-type': 'application/json' } }); }) as unknown as typeof fetch;
+  await main(['list', '-r'], { cwd: tmp(), home: tmp(), env: { MYREGISTRY_BASE_URL: 'http://reg' }, out: () => {}, err: () => {}, fetch: f });
+  assert.match(seen[0], /^myregistry-cli\/\d+\.\d+\.\d+/);
+});
