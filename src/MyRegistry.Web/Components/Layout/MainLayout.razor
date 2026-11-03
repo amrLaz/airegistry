@@ -71,7 +71,11 @@
                 <MudDivider />
                 <MudMenuItem Href="/my" Icon="@Icons.Material.Filled.Upload">@L["my_pubs"]</MudMenuItem>
                 <MudMenuItem Href="/notifications" Icon="@Icons.Material.Filled.Notifications">@L["notif_title"]</MudMenuItem>
-                @if (_user.Role >= Role.Publisher) { <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Extension">@L["plugin_editor"]</MudMenuItem> }
+                @if (_user.Role >= Role.Publisher)
+                {
+                    <MudMenuItem Href="/plugins" Icon="@Icons.Material.Filled.Extension">@L["plugin_editor"]</MudMenuItem>
+                    <MudMenuItem Href="/tokens" Icon="@Icons.Material.Filled.Key">@L["tokens_title"]</MudMenuItem>
+                }
                 @if (_user.Role >= Role.Moderator)
                 {
                     <MudDivider Class="my-1" />

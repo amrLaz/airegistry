@@ -87,6 +87,21 @@ public class Comment
     public DateTime At { get; set; } = DateTime.UtcNow;
 }
 
+public class CliToken
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    /// <summary>SHA-256 du jeton : le jeton lui-même n'est jamais stocké.</summary>
+    public string TokenHash { get; set; } = "";
+    public string UserEmail { get; set; } = "";
+    /// <summary>« interactive » (1 min, flux navigateur) ou « ci » (longue durée, créé depuis l'interface).</summary>
+    public string Kind { get; set; } = "interactive";
+    public string? Name { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? LastUsedAt { get; set; }
+    public DateTime? RevokedAt { get; set; }
+}
+
 public class CommentReport
 {
     public Guid Id { get; set; } = Guid.NewGuid();

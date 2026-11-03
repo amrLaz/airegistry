@@ -34,7 +34,7 @@ node dist/index.js publish ./mon-skill                # soumettre (statut Pendin
 node dist/index.js add myregistry/mon-skill --agent claude
 node dist/index.js list && node dist/index.js outdated
 ```
-Commandes disponibles : `config`, `list [-r]`, `add`, `remove`, `outdated`, `update`, `pack`, `check`, `publish [--dry-run]`, `version`. Pas encore : `login`, `edit`, `add-registry`, `completion`.
+Commandes disponibles : `config`, `list [-r]`, `add`, `remove`, `outdated`, `update`, `pack`, `check`, `publish [--dry-run]`, `login`, `edit`, `add-registry`, `version`. Pas encore : `completion`.
 
 ## Avec PostgreSQL (plus tard)
 ```bash

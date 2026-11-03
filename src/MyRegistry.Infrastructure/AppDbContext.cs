@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScanBaseline> Baselines => Set<ScanBaseline>();
     public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
+    public DbSet<CliToken> CliTokens => Set<CliToken>();
     public DbSet<CommentReport> CommentReports => Set<CommentReport>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
@@ -101,6 +102,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Vote>(e => { e.ToTable("votes"); e.HasKey(x => new { x.ArtifactId, x.UserId }); });
         b.Entity<Report>().ToTable("reports");
         b.Entity<Comment>().ToTable("comments");
+        b.Entity<CliToken>(e =>
+        {
+            e.ToTable("cli_tokens");
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserEmail);
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.Property(x => x.UserEmail).HasMaxLength(200);
+            e.Property(x => x.Kind).HasMaxLength(20);
+            e.Property(x => x.Name).HasMaxLength(80);
+        });
         b.Entity<CommentReport>(e =>
         {
             e.ToTable("comment_reports");

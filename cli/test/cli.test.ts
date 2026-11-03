@@ -156,7 +156,7 @@ test('config écrit et relit l\'URL du registre', async () => {
 
 test('commande inconnue et non implémentée', async () => {
   assert.equal((await run(['bidule'], tmp(), tmp())).code, 1);
-  const l = await run(['login'], tmp(), tmp());
+  const l = await run(['completion'], tmp(), tmp());
   assert.equal(l.code, 1);
   assert.match(l.err, /pas encore implémentée/);
 });

@@ -71,6 +71,20 @@ public class CatalogService(AppDbContext db, MarketplaceCache marketplace, PullR
         return (ns, name);
     }
 
+    /// <summary>Version à éditer (tous statuts) : la demandée, sinon la plus récente de la famille.</summary>
+    public async Task<ArtifactVersion?> GetForEditAsync(string ns, string name, string? version, CancellationToken ct = default)
+    {
+        (ns, name) = await ResolveAliasAsync(ns, name, ct);
+        var q = db.Versions.Include(v => v.Artifact).Include(v => v.Files).Where(v => v.Artifact.Namespace == ns && v.Artifact.Name == name);
+        if (version is not null) q = q.Where(v => v.Version == version);
+        return (await q.ToListAsync(ct)).OrderByDescending(v => v.CreatedAt).FirstOrDefault();
+    }
+
+    /// <summary>Droit d'édition : un Admin, ou quelqu'un qui a publié au moins une version de la famille.</summary>
+    public Task<bool> CanEditAsync(Guid artifactId, CurrentUser user, CancellationToken ct = default) =>
+        user.Role == Role.Admin ? Task.FromResult(true)
+            : db.Versions.AnyAsync(v => v.ArtifactId == artifactId && v.CreatedBy == user.Email, ct);
+
     /// <summary>Versions approuvées et non quarantinées d'une famille (alias de namespace résolus), avec leurs fichiers.</summary>
     public async Task<IReadOnlyList<ArtifactVersion>> ApprovedVersionsAsync(string ns, string name, ArtifactType type, CancellationToken ct = default)
     {

@@ -163,3 +163,13 @@ public sealed class SecurityRescanJob : IBackgroundJob
         await svc.BackfillAsync("system", ct);
     }
 }
+
+/// <summary>Supprime les jetons CLI expirés depuis plus de 7 jours (les jetons actifs et récents restent consultables).</summary>
+public sealed class CliTokenPurgeJob : IBackgroundJob
+{
+    public string Name => "cli-token-purge";
+    public TimeSpan Interval => TimeSpan.FromHours(24);
+
+    public async Task RunAsync(IServiceProvider sp, CancellationToken ct) =>
+        await sp.GetRequiredService<CliTokenService>().PurgeAsync(ct);
+}

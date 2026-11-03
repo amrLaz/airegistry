@@ -49,6 +49,7 @@ builder.Services.AddSingleton<IJobLock>(_ => string.IsNullOrWhiteSpace(connectio
 builder.Services.AddSingleton<IBackgroundJob, FeedSyncJob>();
 builder.Services.AddSingleton<IBackgroundJob, SnapshotJob>();
 builder.Services.AddSingleton<IBackgroundJob, SecurityRescanJob>();
+builder.Services.AddSingleton<IBackgroundJob, CliTokenPurgeJob>();
 builder.Services.AddSingleton<JobExecutor>();
 // Les jobs ne tournent pas en test ni si MYREGISTRY_JOBS=off (ex. un réplica dédié à l'interface).
 if (!builder.Environment.IsEnvironment("Testing") && !string.Equals(builder.Configuration["JOBS"], "off", StringComparison.OrdinalIgnoreCase))
@@ -60,6 +61,8 @@ builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<CliTokenService>();
+builder.Services.AddScoped<ICliTokenResolver>(sp => sp.GetRequiredService<CliTokenService>());
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 
@@ -107,6 +110,7 @@ app.MapApi();
 app.MapAdminApi();
 app.MapNotificationApi();
 app.MapNpmApi();
+app.MapCliApi();
 app.MapPluginApi();
 app.MapFeedApi();
 app.MapSecurityApi();

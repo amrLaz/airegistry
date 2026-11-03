@@ -7,8 +7,13 @@ export interface CatalogItem {
 export interface ByName { id: string; namespace: string; name: string; type: ArtifactType; version: string; contentHash: string }
 export interface Issue { code: string; message: string; file?: string; line?: number }
 
+export interface EditSource {
+  id: string; namespace: string; name: string; type: ArtifactType; version: string; description?: string; status: string; mainFile?: string;
+  tags: string[]; files: { path: string; isBinary: boolean; content: string }[];
+}
+
 export class Api {
-  constructor(private baseUrl: string, private token?: string, private fetchImpl: typeof fetch = fetch) {}
+  constructor(private baseUrl: string, public token?: string, private fetchImpl: typeof fetch = fetch) {}
 
   private async request(pathAndQuery: string, init: RequestInit = {}): Promise<Response> {
     const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
@@ -18,6 +23,23 @@ export class Api {
     } catch {
       throw new CliError(`Registre injoignable : ${this.baseUrl} (vérifiez MYREGISTRY_BASE_URL ou « myregistry config »).`);
     }
+  }
+
+  /** Utilisateur courant ; undefined si le serveur ne l'expose pas (ancienne version). */
+  async me(): Promise<{ email: string; role: string; authenticated: boolean } | undefined> {
+    const res = await this.request('/api/me');
+    if (!res.ok) return undefined;
+    return (await res.json()) as { email: string; role: string; authenticated: boolean };
+  }
+
+  async editSource(ns: string, name: string, version?: string): Promise<EditSource> {
+    const p = new URLSearchParams({ ns, name });
+    if (version) p.set('version', version);
+    const res = await this.request(`/api/cli/edit/source?${p}`);
+    if (res.status === 404) throw new CliError(`Artefact introuvable : ${ns}/${name}${version ? `@${version}` : ''}.`);
+    if (res.status === 401 || res.status === 403) throw new CliError('Édition refusée : seuls l\'auteur et un Admin peuvent éditer.');
+    if (!res.ok) throw new CliError(`Échec de la lecture des sources (${res.status}).`);
+    return (await res.json()) as EditSource;
   }
 
   async list(q: { type?: string; search?: string; tag?: string; page?: number; pageSize?: number }) {

@@ -1,0 +1,77 @@
+@page "/tokens"
+@inject CliTokenService Svc
+@inject Localizer L
+@inject IAuthProvider Auth
+@implements IDisposable
+
+<PageTitle>@L["tokens_title"] · MyRegistry</PageTitle>
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h4" Component="@("h1")" Style="font-weight:800">@L["tokens_title"]</MudText>
+    <MudText Color="Color.Secondary">@L["tokens_intro"]</MudText>
+
+    @if (_user.Role < Role.Publisher)
+    {
+        <MudAlert Severity="Severity.Warning">@L["forbidden"]</MudAlert>
+    }
+    else
+    {
+        <MudPaper Outlined Class="pa-4">
+            <MudStack Row Wrap="Wrap.Wrap" Spacing="2" AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="_name" Label="@L["tokens_name"]" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="80" Style="max-width:320px" />
+                <MudNumericField T="int?" @bind-Value="_days" Label="@L["tokens_days"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="90" Style="max-width:200px" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create">@L["tokens_create"]</MudButton>
+            </MudStack>
+            @if (_shown is not null)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mt-3">@L["tokens_once"]</MudAlert>
+                <MudTextField Value="_shown" ReadOnly Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2" Style="font-family:monospace" />
+            }
+        </MudPaper>
+
+        @if (_items.Count == 0) { <MudText Color="Color.Secondary">@L["tokens_none"]</MudText> }
+        @foreach (var t in _items)
+        {
+            var tt = t;
+            <MudPaper Outlined Class="pa-3">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                    <div style="flex:1 1 260px;min-width:0">
+                        <MudText Style="font-weight:600">@(tt.Name ?? tt.Id.ToString()[..8])</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @L["tokens_expires"] @tt.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy")
+                            @(tt.LastUsedAt is { } lu ? $" · {L["tokens_last_used"]} {lu.ToLocalTime():dd/MM/yyyy HH:mm}" : "")
+                        </MudText>
+                    </div>
+                    @if (tt.Active) { <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" OnClick="() => Revoke(tt)">@L["tokens_revoke"]</MudButton> }
+                    else { <MudChip T="string" Size="Size.Small">@L["tokens_revoked"]</MudChip> }
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</MudStack>
+
+@code {
+    private IReadOnlyList<CliTokenDto> _items = [];
+    private string _name = "";
+    private int? _days = 30;
+    private string? _shown;
+    private CurrentUser _user = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = Auth.GetCurrentUser();
+        L.Changed += OnChanged;
+        if (_user.Role >= Role.Publisher) _items = await Svc.ListAsync(_user.Email);
+    }
+
+    private async Task Create()
+    {
+        var issued = await Svc.IssueAsync(_user.Email, "ci", TimeSpan.FromDays(CliAuthRules.ClampCiDays(_days)), _name);
+        _shown = issued.Token; _name = "";
+        _items = await Svc.ListAsync(_user.Email);
+    }
+
+    private async Task Revoke(CliTokenDto t) { await Svc.RevokeAsync(_user.Email, t.Id); _items = await Svc.ListAsync(_user.Email); _shown = null; }
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= OnChanged;
+}
