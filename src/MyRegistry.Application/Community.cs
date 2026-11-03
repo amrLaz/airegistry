@@ -72,3 +72,19 @@ public static class Exports
         return sb.ToString();
     }
 }
+
+public static class CommentPolicy
+{
+    public const int AutoHideThreshold = 3;
+
+    /// <summary>L'auteur supprime son commentaire ; un modérateur (ou plus) supprime n'importe lequel.</summary>
+    public static bool CanDelete(string author, string user, Role role) =>
+        string.Equals(author, user, StringComparison.OrdinalIgnoreCase) || role >= Role.Moderator;
+
+    /// <summary>≥ 3 signalements d'utilisateurs distincts → commentaire masqué en attendant la modération.</summary>
+    public static bool ShouldAutoHide(IEnumerable<string> reporters) =>
+        reporters.Select(r => r.Trim().ToLowerInvariant()).Distinct().Count() >= AutoHideThreshold;
+
+    /// <summary>On ne signale pas son propre commentaire.</summary>
+    public static bool CanReport(string author, string user) => !string.Equals(author, user, StringComparison.OrdinalIgnoreCase);
+}

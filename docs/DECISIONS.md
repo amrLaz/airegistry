@@ -171,3 +171,8 @@
 - Les notifications sont ajoutées au contexte et sauvegardées avec la transaction de l'action métier ; pas de notification sans l'action.
 - API : `/api/notifications` (liste, unread-count, read, archive, suppression, actions en masse, préférences). Les données sont toujours limitées à l'utilisateur courant.
 - Pas de courriel ni de push : hors périmètre ; le modèle laisse la place à un canal supplémentaire.
+
+## Modération des commentaires
+- Suppression : l'auteur ou un modérateur (et plus) ; `DELETE /api/catalog/{id}/comments/{commentId}` (403 sinon, 404 si inconnu). Les signalements du commentaire sont supprimés avec lui.
+- Signalement : `POST …/comments/{commentId}/report`, un signalant ne compte qu'une fois, on ne signale pas son propre commentaire (400). À 3 signalants distincts, le commentaire est masqué (`Hidden`) et l'événement est audité (`comment-hide`).
+- Entité `comment_reports` (migration `CommentReports`). Le vote (upvote) et les commentaires existaient déjà côté API et interface.

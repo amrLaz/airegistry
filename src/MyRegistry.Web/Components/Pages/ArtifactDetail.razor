@@ -109,7 +109,19 @@
                     @foreach (var c in _comments)
                     {
                         <div style="border-top:1px dashed rgba(128,128,128,.4);padding:8px 0">
-                            <MudText Typo="Typo.caption">@c.UserId · @c.At.ToString("yyyy-MM-dd HH:mm")</MudText>
+                            <MudStack Row AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.caption" Style="flex:1">@c.UserId · @c.At.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                @if (CommentPolicy.CanReport(c.UserId, _user.Email))
+                                {
+                                    var rc = c;
+                                    <MudIconButton Icon="@Icons.Material.Filled.Flag" Size="Size.Small" OnClick="() => ReportComment(rc)" aria-label="@L["comment_report"]" title="@L["comment_report"]" />
+                                }
+                                @if (CommentPolicy.CanDelete(c.UserId, _user.Email, _user.Role))
+                                {
+                                    var dc = c;
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteComment(dc)" aria-label="@L["delete"]" />
+                                }
+                            </MudStack>
                             <MudText>@c.Body</MudText>
                         </div>
                     }
@@ -307,6 +319,18 @@
     private async Task AddComment()
     {
         if (await Community.AddCommentAsync(Id, _user.Email, _newComment) is { } c) { _comments.Add(c); _newComment = ""; }
+    }
+
+    private async Task DeleteComment(CommentDto c)
+    {
+        if (await Community.DeleteCommentAsync(Id, c.Id, _user) == true) _comments.RemoveAll(x => x.Id == c.Id);
+    }
+
+    private async Task ReportComment(CommentDto c)
+    {
+        var r = await Community.ReportCommentAsync(Id, c.Id, _user.Email, null);
+        if (r.Hidden) _comments.RemoveAll(x => x.Id == c.Id);
+        Snack.Add(L["comment_reported"], Severity.Success);
     }
 
     private async Task SendReport()

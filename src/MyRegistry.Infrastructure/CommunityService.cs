@@ -5,6 +5,7 @@ using MyRegistry.Domain;
 namespace MyRegistry.Infrastructure;
 
 public sealed record CommentDto(Guid Id, string UserId, string Body, DateTime At);
+public sealed record CommentReportResult(bool Found, bool Own, bool Hidden);
 public sealed record ReportResult(bool Accepted, bool Quarantined);
 public sealed record MyPublication(Guid Id, string Namespace, string Name, ArtifactType Type, string Version, VersionStatus Status, bool Quarantined, DateTime CreatedAt);
 
@@ -92,5 +93,43 @@ public class CommunityService(AppDbContext db, MarketplaceCache marketplace, Not
         var known = await db.Versions.Where(v => v.Artifact.Namespace == ns && v.Artifact.Name == name && v.Artifact.Type == type)
             .Select(v => v.Version).ToListAsync(ct);
         return Application.Rules.VersionRules.Resolve(requested, known).Version;
+    }
+
+    /// <summary>Supprime un commentaire : 404 si inconnu, false si les droits manquent.</summary>
+    public async Task<bool?> DeleteCommentAsync(Guid versionId, Guid commentId, CurrentUser user, CancellationToken ct = default)
+    {
+        var c = await CommentOfAsync(versionId, commentId, ct);
+        if (c is null) return null;
+        if (!CommentPolicy.CanDelete(c.UserId, user.Email, user.Role)) return false;
+        db.CommentReports.RemoveRange(db.CommentReports.Where(r => r.CommentId == commentId));
+        db.Comments.Remove(c);
+        db.Audit.Add(new AuditEntry { UserId = user.Email, Action = "comment-delete", Entity = "Comment", EntityId = commentId.ToString(), Details = c.UserId });
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    /// <summary>Signale un commentaire ; masqué automatiquement à partir de 3 signalants distincts. Un signalant ne compte qu'une fois.</summary>
+    public async Task<CommentReportResult> ReportCommentAsync(Guid versionId, Guid commentId, string userId, string? reason, CancellationToken ct = default)
+    {
+        var c = await CommentOfAsync(versionId, commentId, ct);
+        if (c is null) return new(false, false, false);
+        if (!CommentPolicy.CanReport(c.UserId, userId)) return new(true, true, c.Hidden);
+        if (!await db.CommentReports.AnyAsync(r => r.CommentId == commentId && r.UserId == userId, ct))
+            db.CommentReports.Add(new CommentReport { CommentId = commentId, UserId = userId, Reason = reason?.Trim() is { Length: > 0 } t ? t[..Math.Min(t.Length, 500)] : null });
+        await db.SaveChangesAsync(ct);
+        var reporters = await db.CommentReports.Where(r => r.CommentId == commentId).Select(r => r.UserId).ToListAsync(ct);
+        if (!c.Hidden && CommentPolicy.ShouldAutoHide(reporters))
+        {
+            c.Hidden = true;
+            db.Audit.Add(new AuditEntry { UserId = "system", Action = "comment-hide", Entity = "Comment", EntityId = commentId.ToString(), Details = "auto: ≥3 reports" });
+            await db.SaveChangesAsync(ct);
+        }
+        return new(true, false, c.Hidden);
+    }
+
+    private async Task<Comment?> CommentOfAsync(Guid versionId, Guid commentId, CancellationToken ct)
+    {
+        var artifactId = await db.Versions.Where(v => v.Id == versionId).Select(v => (Guid?)v.ArtifactId).FirstOrDefaultAsync(ct);
+        return artifactId is null ? null : await db.Comments.FirstOrDefaultAsync(x => x.Id == commentId && x.ArtifactId == artifactId, ct);
     }
 }

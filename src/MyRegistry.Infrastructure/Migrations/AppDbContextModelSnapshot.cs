@@ -234,6 +234,35 @@ namespace MyRegistry.Infrastructure.Migrations
                     b.ToTable("comments", (string)null);
                 });
 
+            modelBuilder.Entity("MyRegistry.Domain.CommentReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("comment_reports", (string)null);
+                });
+
             modelBuilder.Entity("MyRegistry.Domain.Feed", b =>
                 {
                     b.Property<Guid>("Id")
