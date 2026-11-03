@@ -13,6 +13,10 @@ public static class SettingKeys
     public const string ContactEmail = "contact_email";
     /// <summary>Posé par l'assistant de premier lancement ; réglage technique, non modifiable par l'utilisateur.</summary>
     public const string SetupCompleted = "setup_completed";
+    /// <summary>Nombre de versions les plus récentes conservées par artefact ; 0 = rétention désactivée (défaut).</summary>
+    public const string RetentionKeepVersions = "retention_keep_versions";
+    /// <summary>Âge minimal (jours) d'une version dépréciée pour être supprimable ; 7 au moins.</summary>
+    public const string RetentionMinAgeDays = "retention_min_age_days";
     public const string SnapshotDigest = "marketplace_snapshot_digest";
     public const string SnapshotAt = "marketplace_snapshot_at";
     public const string SnapshotCommit = "marketplace_snapshot_commit";
