@@ -26,6 +26,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScanBaseline> Baselines => Set<ScanBaseline>();
     public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
+    public DbSet<Webhook> Webhooks => Set<Webhook>();
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
     public DbSet<CliToken> CliTokens => Set<CliToken>();
     public DbSet<CommentReport> CommentReports => Set<CommentReport>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -102,6 +104,25 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Vote>(e => { e.ToTable("votes"); e.HasKey(x => new { x.ArtifactId, x.UserId }); });
         b.Entity<Report>().ToTable("reports");
         b.Entity<Comment>().ToTable("comments");
+        b.Entity<Webhook>(e =>
+        {
+            e.ToTable("webhooks");
+            e.Property(x => x.Name).HasMaxLength(60);
+            e.Property(x => x.Url).HasMaxLength(500);
+            e.Property(x => x.Format).HasMaxLength(10);
+            e.Property(x => x.Secret).HasMaxLength(200);
+            e.Property(x => x.Events).HasMaxLength(200);
+            e.Property(x => x.CreatedBy).HasMaxLength(200);
+        });
+        b.Entity<WebhookDelivery>(e =>
+        {
+            e.ToTable("webhook_deliveries");
+            e.HasIndex(x => new { x.Status, x.NextAttemptAt });
+            e.HasIndex(x => x.WebhookId);
+            e.Property(x => x.Event).HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(12);
+            e.Property(x => x.LastError).HasMaxLength(500);
+        });
         b.Entity<CliToken>(e =>
         {
             e.ToTable("cli_tokens");

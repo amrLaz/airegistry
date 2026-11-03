@@ -44,6 +44,7 @@ public sealed class DbFixture : IAsyncLifetime
         {
             b.UseEnvironment("Testing");
             b.UseSetting("DB_CONNECTION", conn);
+            b.UseSetting("WEBHOOK_ALLOW_PRIVATE", "true"); // les récepteurs de test écoutent sur 127.0.0.1
         });
         using var scope = Factory.Services.CreateScope();
         await Seeder.MigrateAndSeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());

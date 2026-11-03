@@ -9,7 +9,7 @@ public sealed record CommentReportResult(bool Found, bool Own, bool Hidden);
 public sealed record ReportResult(bool Accepted, bool Quarantined);
 public sealed record MyPublication(Guid Id, string Namespace, string Name, ArtifactType Type, string Version, VersionStatus Status, bool Quarantined, DateTime CreatedAt);
 
-public class CommunityService(AppDbContext db, MarketplaceCache marketplace, NotificationService notifications)
+public class CommunityService(AppDbContext db, MarketplaceCache marketplace, NotificationService notifications, WebhookService webhooks)
 {
     public async Task<ReportResult?> ReportAsync(Guid versionId, ReportReason reason, string? details, string userId, CancellationToken ct = default)
     {
@@ -21,6 +21,7 @@ public class CommunityService(AppDbContext db, MarketplaceCache marketplace, Not
         var family = await db.Artifacts.AsNoTracking().FirstAsync(a => a.Id == v.ArtifactId, ct);
         await notifications.AddAsync(await notifications.EmailsWithRoleAtLeastAsync(Role.Moderator, ct), userId, NotificationKind.ReportFiled,
             NotificationRules.Subject(family.Namespace, family.Name, v.Version), reason.ToString(), NotificationRules.ArtifactLink(versionId), ct);
+        await webhooks.EnqueueAsync(new(WebhookEvents.NameOf(NotificationKind.ReportFiled), NotificationRules.Subject(family.Namespace, family.Name, v.Version), reason.ToString(), NotificationRules.ArtifactLink(versionId), userId, DateTime.UtcNow), ct);
         await db.SaveChangesAsync(ct);
 
         var times = (await db.Reports.Where(r => r.VersionId == versionId).Select(r => new { r.UserId, r.At }).ToListAsync(ct)).Select(r => (r.UserId, r.At)).ToList();
@@ -63,6 +64,7 @@ public class CommunityService(AppDbContext db, MarketplaceCache marketplace, Not
         var owners = await db.Versions.AsNoTracking().Where(v => v.ArtifactId == artifactId).Select(v => v.CreatedBy).Distinct().ToListAsync(ct);
         await notifications.AddAsync(owners, userId, NotificationKind.CommentAdded,
             NotificationRules.Subject(target.Artifact.Namespace, target.Artifact.Name, target.Version), null, NotificationRules.ArtifactLink(versionId), ct);
+        await webhooks.EnqueueAsync(new(WebhookEvents.NameOf(NotificationKind.CommentAdded), NotificationRules.Subject(target.Artifact.Namespace, target.Artifact.Name, target.Version), null, NotificationRules.ArtifactLink(versionId), userId, DateTime.UtcNow), ct);
         await db.SaveChangesAsync(ct);
         return new(c.Id, c.UserId, c.Body, c.At);
     }

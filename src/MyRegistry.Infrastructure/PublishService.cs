@@ -6,7 +6,7 @@ using MyRegistry.Domain;
 
 namespace MyRegistry.Infrastructure;
 
-public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests, SecurityService security, NotificationService notifications, Microsoft.Extensions.Logging.ILogger<PublishService> log)
+public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests, SecurityService security, NotificationService notifications, WebhookService webhooks, Microsoft.Extensions.Logging.ILogger<PublishService> log)
 {
     public async Task<ImportResult> ImportAsync(ImportRequest req, CurrentUser user, CancellationToken ct = default)
     {
@@ -86,6 +86,7 @@ public class PublishService(AppDbContext db, PullRequestWorkflow pullRequests, S
         db.Audit.Add(new AuditEntry { UserId = user.Email, Action = "import", Entity = "ArtifactVersion", EntityId = version.Id.ToString(), Details = $"{req.Namespace}/{req.Name}@{version.Version}" });
         await notifications.AddAsync(await notifications.EmailsWithRoleAtLeastAsync(Role.Moderator, ct), user.Email, NotificationKind.NewSubmission,
             NotificationRules.Subject(req.Namespace, req.Name, version.Version), null, NotificationRules.ArtifactLink(version.Id), ct);
+        await webhooks.EnqueueAsync(new(WebhookEvents.NameOf(NotificationKind.NewSubmission), NotificationRules.Subject(req.Namespace, req.Name, version.Version), null, NotificationRules.ArtifactLink(version.Id), user.Email, DateTime.UtcNow), ct);
         await db.SaveChangesAsync(ct);
         if (scan is not null) await security.RecordDirectScanAsync(version, scan, ct);
 

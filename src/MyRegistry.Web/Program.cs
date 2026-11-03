@@ -64,6 +64,7 @@ builder.Services.AddSingleton<IBackgroundJob, FeedSyncJob>();
 builder.Services.AddSingleton<IBackgroundJob, SnapshotJob>();
 builder.Services.AddSingleton<IBackgroundJob, SecurityRescanJob>();
 builder.Services.AddSingleton<IBackgroundJob, CliTokenPurgeJob>();
+builder.Services.AddSingleton<IBackgroundJob, WebhookDeliveryJob>();
 builder.Services.AddSingleton<JobExecutor>();
 // Les jobs ne tournent pas en test ni si MYREGISTRY_JOBS=off (ex. un réplica dédié à l'interface).
 if (!builder.Environment.IsEnvironment("Testing") && !string.Equals(builder.Configuration["JOBS"], "off", StringComparison.OrdinalIgnoreCase))
@@ -75,6 +76,11 @@ builder.Services.AddScoped<PublishService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<NotificationService>();
+// Webhooks sortants : destinations internes refusées (SSRF) sauf MYREGISTRY_WEBHOOK_ALLOW_PRIVATE=true (développement et tests uniquement).
+var webhookPrivate = string.Equals(builder.Configuration["WEBHOOK_ALLOW_PRIVATE"], "true", StringComparison.OrdinalIgnoreCase);
+builder.Services.AddSingleton(new WebhookOptions(webhookPrivate));
+builder.Services.AddHttpClient(WebhookService.ClientName).ConfigurePrimaryHttpMessageHandler(() => WebhookService.CreateHandler(webhookPrivate));
+builder.Services.AddScoped<WebhookService>();
 builder.Services.AddScoped<CliTokenService>();
 builder.Services.AddSingleton<IBlobStore>(_ => BlobStoreFactory.Create(builder.Configuration["BLOB_CONNECTION_STRING"], builder.Configuration["BLOB_ACCOUNT_URL"],
     builder.Configuration["BLOB_CONTAINER"], builder.Configuration["BLOB_PATH"]));
@@ -146,6 +152,7 @@ app.MapNotificationApi();
 app.MapNpmApi();
 app.MapCliApi();
 app.MapSetupApi();
+app.MapWebhookApi();
 app.MapPluginApi();
 app.MapFeedApi();
 app.MapSecurityApi();
