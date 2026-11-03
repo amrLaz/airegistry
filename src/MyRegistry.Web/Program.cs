@@ -14,6 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Config 12-factor : MYREGISTRY_DB_CONNECTION -> DB_CONNECTION, etc.
 builder.Configuration.AddEnvironmentVariables("MYREGISTRY_");
 
+// Secrets : variables d'environnement, puis Key Vault (identité managée). Un secret « oidc-client-secret » devient la clé OIDC_CLIENT_SECRET.
+// Ajouté avant toute lecture de configuration : la chaîne de connexion et le secret OIDC peuvent venir du coffre.
+if (builder.Configuration["KEYVAULT_URI"] is { Length: > 0 } vaultUri)
+    builder.Configuration.AddAzureKeyVault(new Uri(vaultUri), new Azure.Identity.DefaultAzureCredential(), new KeyVaultKeyMapper());
+
 // Sans MYREGISTRY_DB_CONNECTION : mode local SQLite (fichier jetable). Sinon PostgreSQL.
 var connection = builder.Configuration["DB_CONNECTION"];
 if (string.IsNullOrWhiteSpace(connection))
@@ -71,6 +76,8 @@ builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<CommunityService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<CliTokenService>();
+builder.Services.AddSingleton<IBlobStore>(_ => BlobStoreFactory.Create(builder.Configuration["BLOB_CONNECTION_STRING"], builder.Configuration["BLOB_ACCOUNT_URL"],
+    builder.Configuration["BLOB_CONTAINER"], builder.Configuration["BLOB_PATH"]));
 builder.Services.AddScoped<SetupService>();
 builder.Services.AddScoped<ICliTokenResolver>(sp => sp.GetRequiredService<CliTokenService>());
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));

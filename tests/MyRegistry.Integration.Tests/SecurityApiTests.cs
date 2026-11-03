@@ -251,6 +251,25 @@ public class SecurityApiTests(DbFixture db) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await As(await User("Moderator")).GetAsync($"/api/admin/security-scans/backfill/{runId}/report.csv")).StatusCode);
     }
 
+    [Fact]
+    public async Task Backfill_report_is_frozen_in_the_blob_store_and_served_from_there()
+    {
+        await Publish(U("frz"), Critical);
+        var r = await (await Admin().PostAsync("/api/admin/security/backfill", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var runId = r.GetProperty("runId").GetGuid();
+
+        using var scope = db.Factory.Services.CreateScope();
+        var blobs = scope.ServiceProvider.GetRequiredService<IBlobStore>();
+        var stored = await blobs.GetAsync(SecurityService.ReportKey(runId));
+        Assert.NotNull(stored);
+        var served = await Admin().GetStringAsync($"/api/admin/security-scans/backfill/{runId}/report.csv");
+        Assert.Equal(System.Text.Encoding.UTF8.GetString(stored!), served);
+
+        // Le rapport reste celui de la fin du passage : on le remplace dans le stockage et c'est cette copie qui est servie.
+        await blobs.PutAsync(SecurityService.ReportKey(runId), System.Text.Encoding.UTF8.GetBytes("artifact\nfige\n"), "text/csv");
+        Assert.Equal("artifact\nfige\n", await Admin().GetStringAsync($"/api/admin/security-scans/backfill/{runId}/report.csv"));
+    }
+
     [Theory]
     [InlineData("=HYPERLINK(\"http://evil\")", "\"'=HYPERLINK(\"\"http://evil\"\")\"")]
     [InlineData("+1+1", "'+1+1")]

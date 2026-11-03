@@ -6,3 +6,4 @@ dist/
 docs/reference/screenshots/
 
 myregistry-local.db*
+local-blobs/

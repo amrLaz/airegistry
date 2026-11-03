@@ -18,7 +18,7 @@ public sealed record BaselineDto(string Yaml, string Sha256, IReadOnlyList<strin
 public sealed record BaselineResult(BaselineDto? Baseline, IReadOnlyList<Issue> Errors);
 public sealed record BackfillResult(Guid RunId, int Scanned, int Blocked, int Failed, int MovedToReview);
 
-public class SecurityService(AppDbContext db, IScanner scanner, SettingsService settings, MarketplaceCache marketplace)
+public class SecurityService(AppDbContext db, IScanner scanner, SettingsService settings, MarketplaceCache marketplace, IBlobStore blobs)
 {
     private static string Hex(byte[] b) => Convert.ToHexString(b).ToLowerInvariant();
 
@@ -256,11 +256,18 @@ public class SecurityService(AppDbContext db, IScanner scanner, SettingsService 
         }
         db.Audit.Add(new AuditEntry { UserId = actor, Action = "security-backfill", Entity = "Security", EntityId = runId.ToString(), Details = $"{scanned} analysée(s), {blocked} bloquée(s), {failed} en échec, {moved} repassée(s) en ToReview" });
         await db.SaveChangesAsync(ct);
+        // Le rapport est figé dans le stockage d'objets : il reste tel qu'il était à la fin du passage, même si les versions changent ensuite.
+        if (await BuildBackfillCsvAsync(runId, ct) is { } csv) await blobs.PutAsync(ReportKey(runId), Encoding.UTF8.GetBytes(csv), "text/csv", ct);
         return new(runId, scanned, blocked, failed, moved);
     }
 
     /// <summary>Rapport CSV d'un passage de backfill. Les cellules commençant par = + - @ sont neutralisées (injection de formules).</summary>
-    public async Task<string?> BackfillCsvAsync(Guid runId, CancellationToken ct = default)
+    public async Task<string?> BackfillCsvAsync(Guid runId, CancellationToken ct = default) =>
+        await blobs.GetAsync(ReportKey(runId), ct) is { } frozen ? Encoding.UTF8.GetString(frozen) : await BuildBackfillCsvAsync(runId, ct);
+
+    public static string ReportKey(Guid runId) => $"security-reports/{runId}.csv";
+
+    private async Task<string?> BuildBackfillCsvAsync(Guid runId, CancellationToken ct)
     {
         var scans = await db.Scans.AsNoTracking().Where(s => s.RunId == runId).Include(s => s.Findings).ToListAsync(ct);
         if (scans.Count == 0) return null;
