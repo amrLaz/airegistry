@@ -15,7 +15,11 @@ public static class Endpoints
         b.AddEndpointFilter(async (ctx, next) =>
         {
             var user = ctx.HttpContext.RequestServices.GetRequiredService<IAuthProvider>().GetCurrentUser();
-            return user.IsAuthenticated && Rank(user.Role) >= Rank(min) ? await next(ctx) : Results.Problem(statusCode: 403, title: "Droits insuffisants", detail: $"Rôle requis : {min}.");
+            if (user.IsAuthenticated && Rank(user.Role) >= Rank(min)) return await next(ctx);
+            // Sans identité du tout (anonyme, jeton invalide) : 401 ; identifié mais désactivé ou sans les droits : 403.
+            return string.IsNullOrEmpty(user.Email)
+                ? Results.Problem(statusCode: 401, title: "Authentification requise")
+                : Results.Problem(statusCode: 403, title: "Droits insuffisants", detail: $"Rôle requis : {min}.");
         });
 
     private static IResult Problem(ImportResult r) =>

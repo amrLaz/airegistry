@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using MyRegistry.Application;
@@ -30,7 +31,15 @@ builder.Services.AddSingleton(new DevAuthOptions
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserDirectory, UserDirectory>();
-builder.Services.AddScoped<IAuthProvider, HttpDevAuthProvider>();
+var oidc = string.Equals(builder.Configuration["AUTH_MODE"], "oidc", StringComparison.OrdinalIgnoreCase);
+builder.Services.AddSingleton(new AuthModeOptions(oidc));
+if (oidc)
+{
+    builder.Services.AddSingleton(OidcSetup.Add(builder));
+    builder.Services.AddScoped<IAuthProvider, OidcAuthProvider>();
+}
+else builder.Services.AddScoped<IAuthProvider, HttpDevAuthProvider>();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<GovernanceService>();
 builder.Services.AddScoped<SettingsService>();
@@ -81,6 +90,22 @@ if (!app.Environment.IsEnvironment("Testing"))
     await Seeder.MigrateAndSeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());
 }
 
+if (oidc)
+{
+    app.UseForwardedHeaders();
+    app.UseAuthentication();
+    // L'interface exige une session : sans elle, redirection vers la connexion Entra ID (l'API répond 401, voir Require).
+    app.Use(async (ctx, next) =>
+    {
+        if (!OidcSetup.IsPublicPath(ctx.Request.Path) && ctx.User.Identity?.IsAuthenticated != true)
+        {
+            await ctx.ChallengeAsync(OidcSetup.Scheme, new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+                { RedirectUri = OidcRules.SafeReturnUrl(ctx.Request.Path + ctx.Request.QueryString) });
+            return;
+        }
+        await next();
+    });
+}
 app.MapStaticAssets();
 app.UseAntiforgery();
 
@@ -107,6 +132,7 @@ app.MapGet("/api/registry-info", async (AppDbContext db, IAuthProvider auth) =>
     };
 }).WithName("RegistryInfo");
 
+app.MapAuthApi();
 app.MapApi();
 app.MapAdminApi();
 app.MapNotificationApi();
