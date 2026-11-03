@@ -106,6 +106,22 @@ public static class Endpoints
                 : Results.Problem(statusCode: 400, title: "Commentaire vide ou artefact introuvable"))
             .Require(Role.Reader).WithName("AddComment");
 
+        catalog.MapDelete("/{id:guid}/comments/{commentId:guid}", async (Guid id, Guid commentId, CommunityService svc, IAuthProvider auth) =>
+            await svc.DeleteCommentAsync(id, commentId, auth.GetCurrentUser()) switch
+            {
+                null => Results.NotFound(),
+                false => Results.Problem(statusCode: 403, title: "Droits insuffisants", detail: "Seul l'auteur ou un modérateur peut supprimer ce commentaire."),
+                true => Results.NoContent(),
+            }).Require(Role.Reader).WithName("DeleteComment");
+
+        catalog.MapPost("/{id:guid}/comments/{commentId:guid}/report", async (Guid id, Guid commentId, CommentReportRequest? body, CommunityService svc, IAuthProvider auth) =>
+        {
+            var r = await svc.ReportCommentAsync(id, commentId, auth.GetCurrentUser().Email, body?.Reason);
+            return !r.Found ? Results.NotFound()
+                : r.Own ? Results.Problem(statusCode: 400, title: "Impossible de signaler son propre commentaire")
+                : Results.Ok(new { hidden = r.Hidden });
+        }).Require(Role.Reader).WithName("ReportComment");
+
         catalog.MapPost("/{id:guid}/unpublish", async (Guid id, CommunityService svc, IAuthProvider auth) =>
         {
             var u = auth.GetCurrentUser();
@@ -202,3 +218,4 @@ public sealed record StatusRequest(VersionStatus Status, string? Note);
 
 public sealed record ReportRequest(ReportReason Reason, string? Details);
 public sealed record CommentRequest(string Body);
+public sealed record CommentReportRequest(string? Reason);

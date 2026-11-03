@@ -26,6 +26,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ScanBaseline> Baselines => Set<ScanBaseline>();
     public DbSet<NamespaceAlias> Aliases => Set<NamespaceAlias>();
     public DbSet<FeedSyncReport> FeedReports => Set<FeedSyncReport>();
+    public DbSet<CommentReport> CommentReports => Set<CommentReport>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
@@ -100,6 +101,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Vote>(e => { e.ToTable("votes"); e.HasKey(x => new { x.ArtifactId, x.UserId }); });
         b.Entity<Report>().ToTable("reports");
         b.Entity<Comment>().ToTable("comments");
+        b.Entity<CommentReport>(e =>
+        {
+            e.ToTable("comment_reports");
+            e.HasIndex(x => new { x.CommentId, x.UserId }).IsUnique();
+            e.Property(x => x.UserId).HasMaxLength(200);
+            e.Property(x => x.Reason).HasMaxLength(500);
+        });
         b.Entity<StatusHistory>(e =>
         {
             e.ToTable("status_history");

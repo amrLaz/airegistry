@@ -54,6 +54,8 @@ public sealed class Localizer
         ["notif_archive"] = ("Archiver", "Archive"),
         ["notif_read"] = ("Marquer comme lu", "Mark as read"),
         ["notif_confirm_delete"] = ("Confirmer la suppression de tout", "Confirm deleting everything"),
+        ["comment_report"] = ("Signaler ce commentaire", "Report this comment"),
+        ["comment_reported"] = ("Commentaire signalé, merci.", "Comment reported, thank you."),
         ["welcome"] = ("Bienvenue sur", "Welcome to"),
         ["tagline"] = ("Le registre interne des artefacts IA : serveurs MCP, skills, agents, prompts, plugins, hooks.",
                        "The internal registry for AI artifacts: MCP servers, skills, agents, prompts, plugins, hooks."),

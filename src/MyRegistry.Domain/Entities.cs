@@ -87,6 +87,15 @@ public class Comment
     public DateTime At { get; set; } = DateTime.UtcNow;
 }
 
+public class CommentReport
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid CommentId { get; set; }
+    public string UserId { get; set; } = "";
+    public string? Reason { get; set; }
+    public DateTime At { get; set; } = DateTime.UtcNow;
+}
+
 public class StatusHistory
 {
     public Guid Id { get; set; } = Guid.NewGuid();
